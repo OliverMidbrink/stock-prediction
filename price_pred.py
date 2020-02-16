@@ -217,14 +217,15 @@ data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 
 
-#model = keras.models.load_model('models/30-day-100stock-best.h5')
+model = keras.models.load_model('models/new_data_model.h5')
 
-model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
-					validation_data=(X_val, Y_val), epochs=10, callbacks=[cb])
+#model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
+#	epochs=10, callbacks=[cb])
+#validation_data=(X_val, Y_val), 
 
-model.save('new_data_model.h5')
+#model.save('models/new_data_model.h5')
 
-sys.exit(0)
+#sys.exit(0)
 
 
 def visualize2(X_, Y_, n_plots=2):
@@ -315,9 +316,9 @@ def evaluate(X_, Y_, n_):
 
 #visualize2(X_val, Y_val, 5)
 
-visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
+#visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
-tp, tn, fp, fn = evaluate(X_val, Y_val, len(X_val))	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
+tp, tn, fp, fn = evaluate(X_val, Y_val, 1000)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
 									# 49.8% of stock data increased in price
 									# 50.1% of stock data decreased in price
 
