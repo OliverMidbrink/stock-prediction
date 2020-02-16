@@ -98,7 +98,6 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 		tot_elements += int((end-start)/(hist_time_steps+pred_time_steps))
 
 		for i in range(0, len(t_df), hist_time_steps+pred_time_steps):
-			count+=1
 			x_p = t_df[i:i+hist_time_steps].values	# get range from i to i + 37
 			#y_p = np.zeros((7, 1))
 			y_p = t_df[i+hist_time_steps:i+(hist_time_steps+pred_time_steps)]["Close"].values
@@ -106,6 +105,23 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 			if i+hist_time_steps+pred_time_steps >= len(t_df):
 				continue
 
+			if np.sum(x_p) / (6 * hist_time_steps + 6 * pred_time_steps) < 0.01:	# Get average value for X
+				print('X mean value is abnormal, removing')
+				continue
+
+			if np.sum(y_p) / pred_time_steps < 0.01 or np.sum(y_p) / pred_time_steps > 0.99: # Get average value for y
+				print('Y mean value is abnormal, removing')
+				continue
+
+			if not np.isfinite(x_p).all():	# If not all the values are finite, don't add element
+				print('X element conains non finite value')
+				continue
+
+			if not np.isfinite(y_p).all():	# If not all the values are finite, don't add element
+				print('Y element conains non finite value')
+				continue
+
+			count+=1
 			X[count] = x_p
 			Y[count] = y_p
 
@@ -149,7 +165,7 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	print('Done.')
 
 
-#create_hdf5('datasets/40Day-swe100-ffill.h5', 'original_dfs/swe_top_100_data.h5', hist_time_steps=40)
+#create_hdf5('datasets/90Day-part1-ffill.h5', 'original_dfs/top10000-part1.h5', hist_time_steps=90)
 #df = pd.read_hdf('top10000-part1.h5', 'df')
 #df.to_csv('top10000-part1.csv')
 #sys.exit(0)
@@ -168,8 +184,9 @@ def load_data(filename):
 # 'Top-700-20-year-Swe-120Day.h5'	# New
 # 'Top-100-20-year.h5'
 # '700Swe-20Year-30Day.h5'		# New
-X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data('datasets/40Day-swe100-ffill.h5')
-hist_time_steps = 40
+dataset = 'datasets/90Day-part1-ffill.h5'
+X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data(dataset)
+hist_time_steps = 90
 pred_time_steps = 7
 
 	# --- Model ---
@@ -186,25 +203,28 @@ model.add(keras.layers.Dense(20))
 model.add(keras.layers.Dense(pred_time_steps))
 
 cb = keras.callbacks.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.4, patience=2)
-opt = keras.optimizers.Adam(lr=0.0005)
+opt = keras.optimizers.Adam(lr=0.001)
 model.compile(loss='mae', optimizer=opt)
 model.summary()
 
 
-def scalar_augment(X_, min_scalar=1, max_scalar=1):
+def scalar_augment(X_elem, min_scalar=1, max_scalar=1):
 	scalar = min_scalar + random.random() * (max_scalar - min_scalar)
-	return X_ * scalar
+	noise = np.random.normal(0, 0.001, X_elem.shape)
+	return (X_elem + noise) * scalar
 
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 
+
 #model = keras.models.load_model('models/30-day-100stock-best.h5')
-#model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
-#					validation_data=(X_val, Y_val), epochs=5, callbacks=[cb])
 
-#model.save('70DayNET-part1.h5')
+model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
+					validation_data=(X_val, Y_val), epochs=10, callbacks=[cb])
 
+model.save('new_data_model.h5')
 
+sys.exit(0)
 
 
 def visualize2(X_, Y_, n_plots=2):
@@ -304,7 +324,7 @@ tp, tn, fp, fn = evaluate(X_val, Y_val, len(X_val))	# 53.4% Accuracy (TP + TN)/(
 Accuracy = (tp + tn)/(tp+tn+fp+fn)
 Percent_up = (tp + fn)/(tp+tn+fp+fn)
 Percent_down = (tn + fp)/(tp+tn+fp+fn)
-print('Accuracy for dataset was: {}, Percent of stocks that went up: {}, percent of stocks that went down {}.'.format(Accuracy, Percent_up, Percent_down))
+print('Taking the mean of prediction values and comparing that to the mean of the label values. \n Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset {} was: {}, Percent of stocks that went up: {}, percent of stocks that went down {}. TP: {}, TN: {}, FP:{}, FN: {}.'.format(dataset, Accuracy, Percent_up, Percent_down, tp, tn, fp, fn))
 
 
 # Results
@@ -321,7 +341,8 @@ Accuracy for dataset was: 0.5290352080475538, Percent of stocks that went up: 0.
 
 # //TODO 
 # 1. Remove data with too many zeros, causes increased false accuracy DONE
-# 2. 10% of data is just forward fill, zero or other value. Worth fixing?
+# 2. 10% of data is just forward fill, zero or other value. Worth fixing? YES!!! MIGHT BE THE CAUSE FOR NAN LOSS!
+	# 2. After fixing 2 I realized that the data was not filtered enought, therefore nan values slipped by. Filtering nan and inf values fixed the nan loss issue.
 # 3. Reinforcement learning?
 
 
