@@ -65,32 +65,40 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	Y = np.zeros((max_length, pred_time_steps))		# The reason for choosing 7 timesteps is that it
 								# eliminates some of the "noise" in the stock data
 
-	print('Creating dataset...')
+	print('Creating dataset... Expecting max {} elements'.format(max_length))
 	count = -1
 	display = 1
-	avg_start = 0
+	tot_elements=0
+
+	sym_count = -1
 	for sym in symbols:
+		sym_count+=1
 		display+=1
 		if display%31 == 0:
 			display=1
-			print('{} percent completed {}.'.format(round(count/len(symbols)*100, 2), sym))
-		count+=1
+			print('{} percent completed {}.'.format(round(sym_count/len(symbols)*100, 2), sym))
+
 		sym_df = n_df[sym]
 		
 		start = 0
-		d = np.where(np.diff(sym_df['Close']))
+		diff = np.diff(sym_df['Close'])
+		#test = np.where(np.diff(np.where(sym_df['Close'] == 0)) > 3)[0][0] 	Could be useful for VOLVO (where there is much space and lonely entries in close history)
+		
 		try:
-			start = np.where(d > 0)[0][0] #start when company is introduced to market
-			print(sym_df[start-3:start+4])
+			if sym_df['Close'][0] == 0:
+				start = np.where(diff > 0)[0][0]+1 #start when company is introduced to market
+			#print(sym_df[max(start-5,0):start+5])
 		except Exception as e:
 			print('Error {}. Start is {}'.format(e, start))
 			print(sym_df)
 
-		avg_start+=start/len(symbols)
-		end = -1
+
+		end = len(sym_df)-1
 		t_df = sym_df[start:end]
+		tot_elements += int((end-start)/(hist_time_steps+pred_time_steps))
 
 		for i in range(0, len(t_df), hist_time_steps+pred_time_steps):
+			count+=1
 			x_p = t_df[i:i+hist_time_steps].values	# get range from i to i + 37
 			#y_p = np.zeros((7, 1))
 			y_p = t_df[i+hist_time_steps:i+(hist_time_steps+pred_time_steps)]["Close"].values
@@ -109,14 +117,11 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	while searching:
 		idx += -1
 		if np.count_nonzero(X[idx]) > 0 and np.count_nonzero(Y[idx]) > 0:
-			print(Y[idx-4:idx+4])
+			print('End Found: {}. Total expected sets: {}.'.format(idx, tot_elements))
 			X = X[:idx+1]
 			Y = Y[:idx+1]
 			searching = False
 
-
-	print('Cut index: {}.'.format(idx))
-	print('Avg start: {}.'.format(avg_start))
 
 	X, Y = shuffle(X, Y)
 	train_frac = 0.6
@@ -144,10 +149,10 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	print('Done.')
 
 
-create_hdf5('40Day-swe100-ffill.h5', 'swe_data.h5', hist_time_steps=40)
+#create_hdf5('datasets/40Day-swe100-ffill.h5', 'original_dfs/swe_top_100_data.h5', hist_time_steps=40)
 #df = pd.read_hdf('top10000-part1.h5', 'df')
 #df.to_csv('top10000-part1.csv')
-sys.exit(0)
+#sys.exit(0)
 
 def load_data(filename):
 	hf = h5py.File(filename, 'r')
@@ -163,8 +168,8 @@ def load_data(filename):
 # 'Top-700-20-year-Swe-120Day.h5'	# New
 # 'Top-100-20-year.h5'
 # '700Swe-20Year-30Day.h5'		# New
-X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data('70Day-part1-ffill.h5')
-hist_time_steps = 70
+X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data('datasets/40Day-swe100-ffill.h5')
+hist_time_steps = 40
 pred_time_steps = 7
 
 	# --- Model ---
@@ -193,7 +198,7 @@ def scalar_augment(X_, min_scalar=1, max_scalar=1):
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 
-model = keras.models.load_model('70DayNET-part1.h5')
+#model = keras.models.load_model('models/30-day-100stock-best.h5')
 #model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
 #					validation_data=(X_val, Y_val), epochs=5, callbacks=[cb])
 
@@ -223,10 +228,16 @@ def visualize2(X_, Y_, n_plots=2):
 
 def visualize3(X_, Y_, hist_time_steps=30, pred_time_steps=7, start=0):
 	fig1, f1_axes = plt.subplots(ncols=7, nrows=7, sharex='col', tight_layout=True)
-	index = -1 + start
+	idx_total = set(range(len(X_)-1))
+
 	for row in range(len(f1_axes)):
 		for col in range(len(f1_axes[0])):
-			index+=1
+			if len(idx_total) < 0:
+				print('Data has run out. Total dataset is: {}.'.format(len(X_)))
+
+			index = random.sample(idx_total, 1)[0]
+			idx_total.remove(index)
+
 			pred = model.predict(np.array([X_[index]]))
 			y = np.array([None]*(hist_time_steps + pred_time_steps))		# y values of graph
 
@@ -244,7 +255,7 @@ def visualize3(X_, Y_, hist_time_steps=30, pred_time_steps=7, start=0):
 	plt.show()
 
 def evaluate(X_, Y_, n_):
-	idx_total = set(range(len(X_)))
+	idx_total = set(range(len(X_)-1))
 
 	tp=0
 	tn=0
@@ -309,8 +320,10 @@ Accuracy for dataset was: 0.5290352080475538, Percent of stocks that went up: 0.
 
 
 # //TODO 
-# 1. Remove data with too many zeros, causes increased false accuracy
-# 2. Reinforcement learning?
+# 1. Remove data with too many zeros, causes increased false accuracy DONE
+# 2. 10% of data is just forward fill, zero or other value. Worth fixing?
+# 3. Reinforcement learning?
+
 
 
 # Future thoughts
