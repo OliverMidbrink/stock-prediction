@@ -191,13 +191,7 @@ pred_time_steps = 7
 
 	# --- Model ---
 model = keras.models.Sequential()
-model.add(keras.layers.GRU(200, return_sequences=True, input_shape=(hist_time_steps,6)))
-model.add(keras.layers.GRU(150, return_sequences=False))
-model.add(keras.layers.Dense(30))
-model.add(keras.layers.Dense(pred_time_steps))
-
-model = keras.models.Sequential()
-model.add(keras.layers.GRU(60, return_sequences=True, input_shape=(hist_time_steps,6)))
+model.add(keras.layers.GRU(60, return_sequences=True, input_shape=(None,6)))	# None for any number of timesteps
 model.add(keras.layers.GRU(30, return_sequences=False))
 model.add(keras.layers.Dense(20))
 model.add(keras.layers.Dense(pred_time_steps))
@@ -210,7 +204,7 @@ model.summary()
 
 def scalar_augment(X_elem, min_scalar=1, max_scalar=1):
 	scalar = min_scalar + random.random() * (max_scalar - min_scalar)
-	noise = np.random.normal(0, 0.001, X_elem.shape)
+	noise = np.random.normal(0, 0.002, X_elem.shape)
 	return (X_elem + noise) * scalar
 
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
@@ -219,11 +213,11 @@ data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 model = keras.models.load_model('models/new_data_model.h5')
 
-#model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
-#	epochs=10, callbacks=[cb])
-#validation_data=(X_val, Y_val), 
+model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
+	validation_data=(X_val, Y_val), epochs=10, callbacks=[cb])
+ 
 
-#model.save('models/new_data_model.h5')
+model.save('models/new_data_model.h5')
 
 #sys.exit(0)
 
@@ -316,7 +310,7 @@ def evaluate(X_, Y_, n_):
 
 #visualize2(X_val, Y_val, 5)
 
-#visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
+visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
 tp, tn, fp, fn = evaluate(X_val, Y_val, 1000)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
 									# 49.8% of stock data increased in price
@@ -328,22 +322,13 @@ Percent_down = (tn + fp)/(tp+tn+fp+fn)
 print('Taking the mean of prediction values and comparing that to the mean of the label values. \n Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset {} was: {}, Percent of stocks that went up: {}, percent of stocks that went down {}. TP: {}, TN: {}, FP:{}, FN: {}.'.format(dataset, Accuracy, Percent_up, Percent_down, tp, tn, fp, fn))
 
 
-# Results
-''' 100 Swedish stocks for 30 days
-True Positive: 484, TN 673, FP 362, FN 668.
-Accuracy for dataset was: 0.5290352080475538, Percent of stocks that went up: 0.5267489711934157, percent of stocks that went down 0.4732510288065844
-'''
-
-# 120 day 100 swedish stocks
-# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
-# 49.8% of stock data increased in price
-# 50.1% of stock data decreased in price
-
 
 # //TODO 
-# 1. Remove data with too many zeros, causes increased false accuracy DONE
-# 2. 10% of data is just forward fill, zero or other value. Worth fixing? YES!!! MIGHT BE THE CAUSE FOR NAN LOSS!
-	# 2. After fixing 2 I realized that the data was not filtered enought, therefore nan values slipped by. Filtering nan and inf values fixed the nan loss issue.
+# 1. Update the evaluation function to take into account how much the stock changed. 
+	# Also, make an array of all the errors and explor that. For instance the
+	# standard deviation of each pred_time_step. This is useful to show the 
+	# uncertainty in the data. 
+# 2. 
 # 3. Reinforcement learning?
 
 
