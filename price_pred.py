@@ -215,7 +215,7 @@ model.compile(loss='mse', optimizer=opt)
 model.summary()
 
 
-def scalar_augment(X_elem, Y_elem, min_scalar=0.5, max_scalar=1.5):
+def scalar_augment(X_elem, Y_elem, min_scalar=1, max_scalar=1):
 	scalar = min_scalar + random.random() * (max_scalar - min_scalar)
 	#noise = np.random.normal(0, 0.001, X_elem.shape)
 	return X_elem * scalar, Y_elem * scalar
