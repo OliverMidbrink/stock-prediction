@@ -213,11 +213,13 @@ data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 model = keras.models.load_model('models/new_data_modelMSE.h5')
 
-model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
+history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
 	validation_data=(X_val, Y_val), epochs=10, callbacks=[cb])
- 
 
 model.save('models/new_data_modelMSE.h5')
+
+with open('/trainHistoryDict', 'wb') as file_pi:
+        pickle.dump(history.history, file_pi)
 
 #sys.exit(0)
 
