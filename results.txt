@@ -6,7 +6,6 @@ True Positive: 457, TN 75, FP 393, FN 75.
 Taking the mean of prediction values and comparing that to the mean of the label values. 
  Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-ffill.h5 was: 0.532, Percent of stocks that went up: 0.532, percent of stocks that went down 0.468. TP: 457, TN: 75, FP:393, FN: 75.
 
-
 2) After further training on the new_data_model.h5, these were the results.
 True Positive: 497, TN 51, FP 423, FN 29.
 Taking the mean of prediction values and comparing that to the mean of the label values. 
@@ -15,3 +14,7 @@ Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-ffill.
 3) Further new_data_model.h5 training with mae. True Positive: 404, TN 129, FP 332, FN 135.
 Taking the mean of prediction values and comparing that to the mean of the label values. 
  Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-ffill.h5 was: 0.533, Percent of stocks that went up: 0.539, percent of stocks that went down 0.461. TP: 404, TN: 129, FP:332, FN: 135.
+
+4) 2 epochs, new_data_modelMSE.h5, mse loss. True Positive: 270, TN 248, FP 193, FN 289.
+Taking the mean of prediction values and comparing that to the mean of the label values. 
+ Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-ffill.h5 was: 0.518, Percent of stocks that went up: 0.559, percent of stocks that went down 0.441. TP: 270, TN: 248, FP:193, FN: 289.
