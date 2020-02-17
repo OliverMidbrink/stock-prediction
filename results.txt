@@ -1,3 +1,5 @@
+The Following are the results for samples on the validation data:
+
 
 1)After testing on 1000 validationn images. This was the new_data_model.h5.
 True Positive: 457, TN 75, FP 393, FN 75.
@@ -5,4 +7,7 @@ Taking the mean of prediction values and comparing that to the mean of the label
  Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-ffill.h5 was: 0.532, Percent of stocks that went up: 0.532, percent of stocks that went down 0.468. TP: 457, TN: 75, FP:393, FN: 75.
 
 
-2) 
+2) After further training on the new_data_model.h5, these were the results.
+True Positive: 497, TN 51, FP 423, FN 29.
+Taking the mean of prediction values and comparing that to the mean of the label values. 
+Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-ffill.h5 was: 0.548, Percent of stocks that went up: 0.526, percent of stocks that went down 0.474. TP: 497, TN: 51, FP:423, FN: 29. 
