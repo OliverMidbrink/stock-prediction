@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 from sklearn import preprocessing
 from sklearn.utils import shuffle
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
 import keras, sys, h5py, random, data_tools, pickle, os, platform
 
 if platform.system() == 'Windows':
@@ -204,7 +206,7 @@ model.add(keras.layers.Dropout(0.1))
 model.add(keras.layers.Dense(pred_time_steps))
 
 
-filepath = os.path.join('checkpoints', 'weights-improvement-{epoch:02d}-{val_loss:.2f}.h5')
+filepath = os.path.join('checkpoints', 'weights-improvement-{epoch:02d}-{val_loss:.6f}.h5')
 check = keras.callbacks.callbacks.ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='max', period=1)
 reduce_lr = keras.callbacks.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor=0.5, verbose=1, patience=3, min_lr = 0.00001)
 
@@ -213,20 +215,20 @@ model.compile(loss='mse', optimizer=opt)
 model.summary()
 
 
-def scalar_augment(X_elem, min_scalar=1, max_scalar=1):
+def scalar_augment(X_elem, Y_elem, min_scalar=0.5, max_scalar=1.5):
 	scalar = min_scalar + random.random() * (max_scalar - min_scalar)
-	noise = np.random.normal(0, 0.001, X_elem.shape)
-	return (X_elem + noise) * scalar
+	#noise = np.random.normal(0, 0.001, X_elem.shape)
+	return X_elem * scalar, Y_elem * scalar
 
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 
-model = keras.models.load_model(os.path.join('models', 'new_data_modelMSE.h5'))
+#model = keras.models.load_model(os.path.join('models', 'new_data_modelMSE.h5'))
 
 history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
 	validation_data=(X_val, Y_val), epochs=40, callbacks=[reduce_lr, check])
 
-model.save(os.path.join('models', 'big_modelMSE.h5'))
+model.save(os.path.join('models', 'dual_aug.h5'))
 
 with open(os.path.join('trainHistoryDict', 'mse_history.txt'), 'wb') as file_pi:
         pickle.dump(history.history, file_pi)

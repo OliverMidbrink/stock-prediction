@@ -22,9 +22,10 @@ class CustomSequence(Sequence):
 			batch_x = []
 			batch_y = []
 			
-			for i in range(len(self.X)):					
-				batch_x.append(self.augment(self.X[i]))	# Append augmented X
-				batch_y.append(self.Y[i])
+			for i in range(len(self.X)):
+				X_, Y_ = self.augment(self.X[i], self.Y[i])				
+				batch_x.append(X_)	# Append augmented X
+				batch_y.append(Y_)
 					
 				if len(batch_x) == self.batch_size:
 					yield np.array(batch_x), np.array(batch_y)
