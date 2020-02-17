@@ -207,7 +207,7 @@ model.add(keras.layers.Dense(pred_time_steps))
 
 
 filepath = os.path.join('checkpoints', 'weights-improvement-{epoch:02d}-{val_loss:.6f}.h5')
-check = keras.callbacks.callbacks.ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='max', period=1)
+check = keras.callbacks.callbacks.ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='min', period=1)
 reduce_lr = keras.callbacks.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor=0.5, verbose=1, patience=3, min_lr = 0.00001)
 
 opt = keras.optimizers.Adam(lr=0.01)
