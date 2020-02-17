@@ -196,8 +196,8 @@ model.add(keras.layers.GRU(30, return_sequences=False))
 model.add(keras.layers.Dense(20))
 model.add(keras.layers.Dense(pred_time_steps))
 
-cb = keras.callbacks.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.4, patience=2)
-opt = keras.optimizers.Adam(lr=0.0003)
+reduce_lr = keras.callbacks.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor=0.5, verbose=1, patience=2, min_lr = 0.000001)
+opt = keras.optimizers.Adam(lr=0.005)
 model.compile(loss='mse', optimizer=opt)
 model.summary()
 
@@ -211,14 +211,14 @@ data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 
 
-model = keras.models.load_model('models/new_data_modelMSE.h5')
+#model = keras.models.load_model('models/new_data_modelMSE.h5')
 
 history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
-	validation_data=(X_val, Y_val), epochs=10, callbacks=[cb])
+	validation_data=(X_val, Y_val), epochs=20, callbacks=[reduce_lr])
 
 model.save('models/new_data_modelMSE.h5')
 
-with open('/trainHistoryDict', 'wb') as file_pi:
+with open('trainHistoryDict/mse_history.txt', 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
 
 #sys.exit(0)
