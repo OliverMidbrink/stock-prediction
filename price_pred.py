@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from sklearn import preprocessing
 from sklearn.utils import shuffle
-import keras, sys, h5py, random, data_tools
+import keras, sys, h5py, random, data_tools, pickle
 
 	# --- Get Symbols ---
 '''
@@ -191,13 +191,19 @@ pred_time_steps = 7
 
 	# --- Model ---
 model = keras.models.Sequential()
-model.add(keras.layers.GRU(60, return_sequences=True, input_shape=(None,6)))	# None for any number of timesteps
-model.add(keras.layers.GRU(30, return_sequences=False))
-model.add(keras.layers.Dense(20))
+model.add(keras.layers.GRU(120, return_sequences=True, input_shape=(None,6)))	# None for any number of timesteps
+model.add(keras.layers.GRU(120, return_sequences=True))	# None for any number of timesteps
+model.add(keras.layers.GRU(60, return_sequences=False))
+model.add(keras.layers.Dense(60))
+model.add(keras.layers.Dropout(0.1))
 model.add(keras.layers.Dense(pred_time_steps))
 
-reduce_lr = keras.callbacks.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor=0.5, verbose=1, patience=2, min_lr = 0.000001)
-opt = keras.optimizers.Adam(lr=0.005)
+
+filepath = "checkpoints/weights-improvement-{epoch:02d}-{val_loss:.2f}.h5"
+check = keras.callbacks.callbacks.ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='max', period=1)
+reduce_lr = keras.callbacks.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor=0.5, verbose=1, patience=3, min_lr = 0.00001)
+
+opt = keras.optimizers.Adam(lr=0.01)
 model.compile(loss='mse', optimizer=opt)
 model.summary()
 
@@ -210,13 +216,12 @@ def scalar_augment(X_elem, min_scalar=1, max_scalar=1):
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 
-
 #model = keras.models.load_model('models/new_data_modelMSE.h5')
 
 history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
-	validation_data=(X_val, Y_val), epochs=20, callbacks=[reduce_lr])
+	validation_data=(X_val, Y_val), epochs=40, callbacks=[reduce_lr, check])
 
-model.save('models/new_data_modelMSE.h5')
+model.save('models/big_modelMSE.h5')
 
 with open('trainHistoryDict/mse_history.txt', 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
