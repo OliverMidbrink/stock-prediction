@@ -4,7 +4,12 @@ import pandas as pd
 import numpy as np
 from sklearn import preprocessing
 from sklearn.utils import shuffle
-import keras, sys, h5py, random, data_tools, pickle
+import keras, sys, h5py, random, data_tools, pickle, os, platform
+
+if platform.system() == 'Windows':
+	gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7)
+	sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+	set_session(sess)
 
 	# --- Get Symbols ---
 '''
@@ -33,7 +38,7 @@ for sym in symbols_list:
 
 	# --- Download and Save ---
 df = yf.download(symbols_text, start="2000-01-01", end="2020-02-10")
-df.to_hdf('top10000-part1.h5', 'df', mode='w', format='fixed')
+df.to_hdf(os.path.join('original_dfs', 'top10000-part1.h5'), 'df', mode='w', format='fixed')
 
 sys.exit(0)
 '''
@@ -165,7 +170,7 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	print('Done.')
 
 
-#create_hdf5('datasets/90Day-part1-ffill.h5', 'original_dfs/top10000-part1.h5', hist_time_steps=90)
+#create_hdf5(os.path.join('datasets', '90Day-part1-ffill.h5'), os.path.join('original_dfs','top10000-part1.h5'), hist_time_steps=90)
 #df = pd.read_hdf('top10000-part1.h5', 'df')
 #df.to_csv('top10000-part1.csv')
 #sys.exit(0)
@@ -184,7 +189,7 @@ def load_data(filename):
 # 'Top-700-20-year-Swe-120Day.h5'	# New
 # 'Top-100-20-year.h5'
 # '700Swe-20Year-30Day.h5'		# New
-dataset = 'datasets/90Day-part1-ffill.h5'
+dataset = os.path.join('datasets', '90Day-part1-ffill.h5')
 X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data(dataset)
 hist_time_steps = 90
 pred_time_steps = 7
@@ -199,7 +204,7 @@ model.add(keras.layers.Dropout(0.1))
 model.add(keras.layers.Dense(pred_time_steps))
 
 
-filepath = "checkpoints/weights-improvement-{epoch:02d}-{val_loss:.2f}.h5"
+filepath = os.path.join('checkpoints', 'weights-improvement-{epoch:02d}-{val_loss:.2f}.h5')
 check = keras.callbacks.callbacks.ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='max', period=1)
 reduce_lr = keras.callbacks.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor=0.5, verbose=1, patience=3, min_lr = 0.00001)
 
@@ -216,14 +221,14 @@ def scalar_augment(X_elem, min_scalar=1, max_scalar=1):
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 
-#model = keras.models.load_model('models/new_data_modelMSE.h5')
+model = keras.models.load_model(os.path.join('models', 'new_data_modelMSE.h5'))
 
 history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
 	validation_data=(X_val, Y_val), epochs=40, callbacks=[reduce_lr, check])
 
-model.save('models/big_modelMSE.h5')
+model.save(os.path.join('models', 'big_modelMSE.h5'))
 
-with open('trainHistoryDict/mse_history.txt', 'wb') as file_pi:
+with open(os.path.join('trainHistoryDict', 'mse_history.txt'), 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
 
 #sys.exit(0)
