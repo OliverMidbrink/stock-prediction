@@ -197,27 +197,27 @@ model.add(keras.layers.Dense(20))
 model.add(keras.layers.Dense(pred_time_steps))
 
 cb = keras.callbacks.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.4, patience=2)
-opt = keras.optimizers.Adam(lr=0.001)
-model.compile(loss='mae', optimizer=opt)
+opt = keras.optimizers.Adam(lr=0.0003)
+model.compile(loss='mse', optimizer=opt)
 model.summary()
 
 
 def scalar_augment(X_elem, min_scalar=1, max_scalar=1):
 	scalar = min_scalar + random.random() * (max_scalar - min_scalar)
-	noise = np.random.normal(0, 0.002, X_elem.shape)
+	noise = np.random.normal(0, 0.001, X_elem.shape)
 	return (X_elem + noise) * scalar
 
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 
 
-model = keras.models.load_model('models/new_data_model.h5')
+model = keras.models.load_model('models/new_data_modelMSE.h5')
 
 model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
 	validation_data=(X_val, Y_val), epochs=10, callbacks=[cb])
  
 
-model.save('models/new_data_model.h5')
+model.save('models/new_data_modelMSE.h5')
 
 #sys.exit(0)
 
