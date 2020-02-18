@@ -289,6 +289,9 @@ def evaluate(X_, Y_, n_):
 	fp=0
 	fn=0
 
+	n_buy_correct = 0
+	n_buy_predictions = 0
+
 	for x in range(n_):
 		i = random.sample(idx_total, 1)[0]
 		idx_total.remove(i)
@@ -297,24 +300,31 @@ def evaluate(X_, Y_, n_):
 		pred = model.predict(np.array([X_[i]]))[0]
 		true = Y_[i]
 
-		avg_pred = -previous_close	# How will the true and pred stock prices differ from the last close price in X
-		avg_true = -previous_close
+		avg_value_pred = -previous_close	# How will the true and pred stock prices differ from the last close price in X
+		avg_value_true = -previous_close
 		for j in range(len(pred)):
-			avg_true+=true[j]/len(true)
-			avg_pred+=pred[j]/len(pred)
+			avg_value_true+=true[j]/len(true)
+			avg_value_pred+=pred[j]/len(pred)
 
-		if avg_pred >= 0:
-			if avg_true >= 0:
+		if avg_value_pred >= 0:
+			if avg_value_true >= 0:
 				tp+=1
-			elif avg_true < 0:
+			elif avg_value_true < 0:
 				fp+=1
 		else:
-			if avg_true >= 0:
+			if avg_value_true >= 0:
 				fn+=1
-			elif avg_true < 0:
+			elif avg_value_true < 0:
 				tn+=1
 
-	print('True Positive: {}, TN {}, FP {}, FN {}.'.format(tp, tn, fp, fn))
+		if avg_value_pred/previous_close > 1.02:	# Predicted 2% increase
+			n_buy_predictions+=1
+			if avg_value_true/previous_close > 1.01:	# Stock actually went up 1%
+				n_buy_correct+=1
+
+
+	buy_accuracy = n_buy_correct/n_buy_predictions
+	print('True Positive: {}, TN {}, FP {}, FN {}. Buy Accuracy {}. N_buy {}, N_buy_correct {}.'.format(tp, tn, fp, fn, buy_accuracy, n_buy_predictions, n_buy_correct))
 	return tp, tn, fp, fn
 
 
