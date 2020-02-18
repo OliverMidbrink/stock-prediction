@@ -22,3 +22,9 @@ Taking the mean of prediction values and comparing that to the mean of the label
 5) 10 more epochs of new_data_modelMSE.h5. True Positive: 332, TN 205, FP 256, FN 207.
 Taking the mean of prediction values and comparing that to the mean of the label values. 
  Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-ffill.h5 was: 0.537, Percent of stocks that went up: 0.539, percent of stocks that went down 0.461. TP: 332, TN: 205, FP:256, FN: 207.
+
+
+6) Took a new_data_modelMSE.h5 and made a simulation, courtage NOT included. True Positive: 10040, TN 3707, FP 7781, FN 3865. Buy Accuracy 0.5717171717171717. N_buy 495, N_buy_correct 283, Mean_up_1% 1.43491060576029, Mean_not_up_1% 0.9416663626319273.
+Taking the mean of prediction values and comparing that to the mean of the label values. 
+ Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-ffill.h5 was: 0.541369668806364, Percent of stocks that went up: 0.5475918560233135, percent of stocks that went down 0.4524081439766865. TP: 10040, TN: 3707, FP:7781, FN: 3865.
+

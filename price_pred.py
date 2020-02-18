@@ -223,15 +223,15 @@ def scalar_augment(X_elem, Y_elem, min_scalar=1, max_scalar=1):
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 
-#model = keras.models.load_model(os.path.join('models', 'new_data_modelMSE.h5'))
+model = keras.models.load_model(os.path.join('models', 'new_data_modelMSE.h5'))
 
-history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
-	validation_data=(X_val, Y_val), epochs=40, callbacks=[reduce_lr, check])
+#history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
+#	validation_data=(X_val, Y_val), epochs=40, callbacks=[reduce_lr, check])
 
-model.save(os.path.join('models', 'dual_aug.h5'))
+#model.save(os.path.join('models', 'dual_aug.h5'))
 
-with open(os.path.join('trainHistoryDict', 'mse_history.txt'), 'wb') as file_pi:
-        pickle.dump(history.history, file_pi)
+#with open(os.path.join('trainHistoryDict', 'mse_history.txt'), 'wb') as file_pi:
+#        pickle.dump(history.history, file_pi)
 
 #sys.exit(0)
 
@@ -293,8 +293,16 @@ def evaluate(X_, Y_, n_):
 
 	n_buy_correct = 0
 	n_buy_predictions = 0
+	n_buy_incorrect = 0
+	accum_change_of_correct_buy = 0	# Divide by number 
+	accum_change_of_incorrect_buy = 0 # Divide by number of elements
 
+	disp_count=0
 	for x in range(n_):
+		disp_count+=1
+		if disp_count > 1000:
+			disp_count=0
+			print('{} percent evaluated.'.format(x/n_))
 		i = random.sample(idx_total, 1)[0]
 		idx_total.remove(i)
 
@@ -302,31 +310,37 @@ def evaluate(X_, Y_, n_):
 		pred = model.predict(np.array([X_[i]]))[0]
 		true = Y_[i]
 
-		avg_value_pred = -previous_close	# How will the true and pred stock prices differ from the last close price in X
-		avg_value_true = -previous_close
+		avg_value_pred = 0	# How will the true and pred stock prices differ from the last close price in X
+		avg_value_true = 0
 		for j in range(len(pred)):
 			avg_value_true+=true[j]/len(true)
 			avg_value_pred+=pred[j]/len(pred)
 
-		if avg_value_pred >= 0:
-			if avg_value_true >= 0:
+		if avg_value_pred - previous_close >= 0:
+			if avg_value_true - previous_close >= 0:
 				tp+=1
-			elif avg_value_true < 0:
+			elif avg_value_true - previous_close < 0:
 				fp+=1
 		else:
-			if avg_value_true >= 0:
+			if avg_value_true - previous_close >= 0:
 				fn+=1
-			elif avg_value_true < 0:
+			elif avg_value_true - previous_close < 0:
 				tn+=1
 
-		if avg_value_pred/previous_close > 1.02:	# Predicted 2% increase
+		if avg_value_pred/previous_close > 1.06:	# Predicted 2% increase
 			n_buy_predictions+=1
-			if avg_value_true/previous_close > 1.01:	# Stock actually went up 1%
+			if avg_value_true/previous_close > 1.01:	# Stock actually went up 1%, therfore it could be considered a success
 				n_buy_correct+=1
+				accum_change_of_correct_buy+=avg_value_true/previous_close
+			else:	# All bought stocks that did not go up 1%
+				n_buy_incorrect+=1
+				accum_change_of_incorrect_buy+=avg_value_true/previous_close
 
 
 	buy_accuracy = n_buy_correct/n_buy_predictions
-	print('True Positive: {}, TN {}, FP {}, FN {}. Buy Accuracy {}. N_buy {}, N_buy_correct {}.'.format(tp, tn, fp, fn, buy_accuracy, n_buy_predictions, n_buy_correct))
+	mean_change_correct_buy = accum_change_of_correct_buy / n_buy_correct
+	mean_change_incorrect_buy = accum_change_of_incorrect_buy / n_buy_incorrect
+	print('True Positive: {}, TN {}, FP {}, FN {}. Buy Accuracy {}. N_buy {}, N_buy_correct {}, Mean_change_of_stocks_up_1% {}, Mean_change_stocks_not_up_1% {}.'.format(tp, tn, fp, fn, buy_accuracy, n_buy_predictions, n_buy_correct, mean_change_correct_buy, mean_change_incorrect_buy))
 	return tp, tn, fp, fn
 
 
@@ -334,9 +348,9 @@ def evaluate(X_, Y_, n_):
 
 #visualize2(X_val, Y_val, 5)
 
-visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
+#visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
-tp, tn, fp, fn = evaluate(X_val, Y_val, 1000)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
+tp, tn, fp, fn = evaluate(X_val, Y_val, len(X_val)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
 									# 49.8% of stock data increased in price
 									# 50.1% of stock data decreased in price
 
