@@ -363,12 +363,18 @@ print('Taking the mean of prediction values and comparing that to the mean of th
 
 # //TODO 
 # 1. Update the evaluation function to take into account how much the stock changed. 
-	# Also, make an array of all the errors and explor that. For instance the
+	# Also, make an array of all the change and explore that. For instance the
 	# standard deviation of each pred_time_step. This is useful to show the 
 	# uncertainty in the data. 
 # 2. 
 # 3. Reinforcement learning?
 
+# // Notes!
+# Since many of the stocks prices are interdependant (if one company performs well that usually benefits similar large companies)
+# It might be so that the model learns the shape/pattern of one TRAINING stock before it goes up, for instance after 2008,
+# and because they might be interdependant, it might see the same pattern in a VALIDATION stock. So it regonizes this pattern and predicts up > 6%
+# and so all of the successful stocks might just be similar patterns from the training data, even the test data might not be "safe". 
+# One possible solution could be to divide up the data, not randomly, but instead during different sections of time. For instance training from 2000-2018, val 2019 and test 2020. 
 
 
 # Future thoughts
