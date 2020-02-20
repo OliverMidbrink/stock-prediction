@@ -362,8 +362,8 @@ print('Taking the mean of prediction values and comparing that to the mean of th
 
 
 # //TODO 
-# 1. Update the evaluation function to take into account how much the stock changed. 
-	# Also, make an array of all the change and explore that. For instance the
+# 1. Divide up the train, val and test data so that none overlap. 
+	# Make an array of all the change and explore that. For instance the
 	# standard deviation of each pred_time_step. This is useful to show the 
 	# uncertainty in the data. 
 # 2. 
