@@ -179,10 +179,12 @@ def load_data(filename):
 
 
 # Available Datasets
+# '90Day-part1-parallel.h5'
+# Obsolete datasets (Train, Val, and Test data was overlapping, causing exagurated results too good to be true)
 # 'Top-700-20-year-Swe.h5'
-# 'Top-700-20-year-Swe-120Day.h5'	# New
+# 'Top-700-20-year-Swe-120Day.h5'
 # 'Top-100-20-year.h5'
-# '700Swe-20Year-30Day.h5'		# New
+# '700Swe-20Year-30Day.h5'		
 dataset = os.path.join('datasets', '90Day-part1-parallel.h5')
 X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data(dataset)
 hist_time_steps = 90
@@ -215,15 +217,15 @@ def scalar_augment(X_elem, Y_elem, min_scalar=1, max_scalar=1):
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 
-#model = keras.models.load_model(os.path.join('models', 'new_data_modelMSE.h5'))
+model = keras.models.load_model(os.path.join('checkpoints', 'weights-improvement-18-0.000434.h5'))
 
-history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
-	validation_data=(X_val, Y_val), epochs=20, callbacks=[reduce_lr, check])
+#history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
+#	validation_data=(X_val, Y_val), epochs=20, callbacks=[reduce_lr, check])
 
-model.save(os.path.join('models', 'parallel.h5'))
+#model.save(os.path.join('models', 'parallel.h5'))
 
-with open(os.path.join('trainHistoryDict', 'mse_history.txt'), 'wb') as file_pi:
-        pickle.dump(history.history, file_pi)
+#with open(os.path.join('trainHistoryDict', 'mse_history.txt'), 'wb') as file_pi:
+#        pickle.dump(history.history, file_pi)
 
 #sys.exit(0)
 
@@ -288,13 +290,15 @@ def evaluate(X_, Y_, n_):
 	n_buy_incorrect = 0
 	accum_change_of_correct_buy = 0	# Divide by number 
 	accum_change_of_incorrect_buy = 0 # Divide by number of elements
+	accum_purchase = 0 # Accum, previous close
+	accum_stock_trans_cost = 0 # Total transaction costs
+	accum_dev_mean = 0	# Mean of true value (label) accumulated, 7 days in some cases
 
 	disp_count=0
 	for x in range(n_):
 		disp_count+=1
-		if disp_count > 1000:
-			disp_count=0
-			print('{} percent evaluated.'.format(x/n_))
+		if disp_count % 1000 == 0:
+			print('{:.3f} percent evaluated.'.format(x/n_*100))
 		i = random.sample(idx_total, 1)[0]
 		idx_total.remove(i)
 
@@ -321,37 +325,46 @@ def evaluate(X_, Y_, n_):
 
 		if avg_value_pred / previous_close > 1.06:	# Predicted 6% increase
 			n_buy_predictions += 1
+			accum_purchase += previous_close	# Buy stock at opening the next day, which would be similar to close at prediction day.
+			accum_stock_trans_cost += previous_close * 0.01	# Counting on 1% transaction fee
+			accum_dev_mean += avg_value_pred
+
 			if avg_value_true / previous_close > 1.01:	# Stock actually went up 1%, therfore it could be considered a success
 				n_buy_correct += 1
-				accum_change_of_correct_buy += (avg_value_true/previous_close)/101	# Subtract courtage
+				accum_change_of_correct_buy += avg_value_true/previous_close
 			else:	# All bought stocks that did not go up 1%
 				n_buy_incorrect += 1
-				accum_change_of_incorrect_buy += (avg_value_true/previous_close)/101	# Subtract courtage
+				accum_change_of_incorrect_buy += avg_value_true/previous_close
 
 
 	buy_accuracy = n_buy_correct/n_buy_predictions
 	mean_change_correct_buy = accum_change_of_correct_buy / n_buy_correct
 	mean_change_incorrect_buy = accum_change_of_incorrect_buy / n_buy_incorrect
-	print('True Positive: {}, TN {}, FP {}, FN {}. Buy Accuracy {}. N_buy {}, N_buy_correct {}, Mean_change_of_stocks_up_1% {}, Mean_change_stocks_not_up_1% {}.'.format(tp, tn, fp, fn, buy_accuracy, n_buy_predictions, n_buy_correct, mean_change_correct_buy, mean_change_incorrect_buy))
-	return tp, tn, fp, fn
+
+	ROI = (accum_dev_mean - accum_purchase - accum_stock_trans_cost) / (accum_purchase + accum_stock_trans_cost)
+	msg = 'True Positive: {}, TN {}, FP {}, FN {}. Buy Accuracy {}. n_buy {}, n_buy_correct {}, Mean_change_of_stocks_up_1% {}, Mean_not_up_1% {}.\nROI: {}. Result true mean of (pred_days): {}, purchase: {}, trans_cost {}.'.format(tp, tn, fp, fn, buy_accuracy, n_buy_predictions, n_buy_correct, mean_change_correct_buy, mean_change_incorrect_buy, ROI, accum_dev_mean, accum_purchase, accum_stock_trans_cost)
+	return (tp, tn, fp, fn), msg
 
 
 
 
 #visualize2(X_val, Y_val, 5)
 
-visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
+#visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
-'''
-tp, tn, fp, fn = evaluate(X_val, Y_val, len(X_val)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
+
+(tp, tn, fp, fn), msg = evaluate(X_val, Y_val, len(X_val)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
 									# 49.8% of stock data increased in price
 									# 50.1% of stock data decreased in price
 
 Accuracy = (tp + tn)/(tp+tn+fp+fn)
 Percent_up = (tp + fn)/(tp+tn+fp+fn)
 Percent_down = (tn + fp)/(tp+tn+fp+fn)
+
+print('Evaluation after creating and training on the parallel dataset. Best out of 20 epochs.') # Put description here before evaluating
+print(msg)
 print('Taking the mean of prediction values and comparing that to the mean of the label values. \n Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset {} was: {}, Percent of stocks that went up: {}, percent of stocks that went down {}. TP: {}, TN: {}, FP:{}, FN: {}.'.format(dataset, Accuracy, Percent_up, Percent_down, tp, tn, fp, fn))
-'''
+
 
 
 # //TODO 
