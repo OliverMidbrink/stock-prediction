@@ -6,7 +6,8 @@ from sklearn import preprocessing
 from sklearn.utils import shuffle
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
-import keras, sys, h5py, random, data_tools, pickle, os, platform
+import keras, sys, h5py, random, data_tools, pickle, os, platform, time
+from data_tools import trim_zeros
 
 if platform.system() == 'Windows':
 	gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7)
@@ -48,114 +49,105 @@ sys.exit(0)
 
 	# --- Create HDF5 Dataset ---
 def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_steps=7): #Create parallel dataset
+	start_time = time.time()
+
+	print('Reading data file...')
 	df = pd.read_hdf(raw_dataset, 'df')
 	df.columns = df.columns.swaplevel(0, 1)
+	print('Done.')
 
 	# Data Variables - key order for df is SYMBOL, VARIABLE, DATE 
 	variables = df.columns.get_level_values(1).unique()
 	symbols = df.columns.get_level_values(0).unique()
 
-
+	# Normalize
+	print('Normalizing data...')
 	n_df = df.copy()
 	n_df = n_df.fillna(method='ffill')
 	n_df = n_df.fillna(0)
-
-
-	for sym in symbols:	#iterate through stocks and normalize data
+	for sym in symbols:	#iterate through stocks and normalize data for that stock
 		v_df = n_df[sym]
 		nv_df=(v_df-v_df.min())/(v_df.max()-v_df.min())
 		n_df[sym] = nv_df
-
-	max_length = int(len(n_df) / (hist_time_steps + pred_time_steps) * len(symbols) * 1.02)
-
-	X = np.zeros((max_length, hist_time_steps, 6))
-	Y = np.zeros((max_length, pred_time_steps))		# The reason for choosing 7 timesteps is that it
-								# eliminates some of the "noise" in the stock data
-
-	print('Creating dataset... Expecting max {} elements'.format(max_length))
-	count = -1
-	display = 1
-	tot_elements=0
-
-	sym_count = -1
-	for sym in symbols:
-		sym_count+=1
-		display+=1
-		if display%31 == 0:
-			display=1
-			print('{} percent completed {}.'.format(round(sym_count/len(symbols)*100, 2), sym))
-
-		sym_df = n_df[sym]
-		
-		start = 0
-		diff = np.diff(sym_df['Close'])
-		#test = np.where(np.diff(np.where(sym_df['Close'] == 0)) > 3)[0][0] 	Could be useful for VOLVO (where there is much space and lonely entries in close history)
-		
-		try:
-			if sym_df['Close'][0] == 0:
-				start = np.where(diff > 0)[0][0]+1 #start when company is introduced to market
-			#print(sym_df[max(start-5,0):start+5])
-		except Exception as e:
-			print('Error {}. Start is {}'.format(e, start))
-			print(sym_df)
+	print('Done.')
 
 
-		end = len(sym_df)-1
-		t_df = sym_df[start:end]
-		tot_elements += int((end-start)/(hist_time_steps+pred_time_steps))
+	max_length = int(len(n_df) / (hist_time_steps + pred_time_steps) * len(symbols) * 1.02)	# Total amount of data periods 
 
-		for i in range(0, len(t_df), hist_time_steps+pred_time_steps):
-			x_p = t_df[i:i+hist_time_steps].values	# get range from i to i + 37
-			#y_p = np.zeros((7, 1))
-			y_p = t_df[i+hist_time_steps:i+(hist_time_steps+pred_time_steps)]["Close"].values
-			
-			if i+hist_time_steps+pred_time_steps >= len(t_df):
-				continue
+	X_train = np.zeros((max_length, hist_time_steps, 6))
+	X_val = np.zeros((max_length, hist_time_steps, 6))
+	X_test = np.zeros((max_length, hist_time_steps, 6))
 
-			if np.sum(x_p) / (6 * hist_time_steps + 6 * pred_time_steps) < 0.01:	# Get average value for X
-				print('X mean value is abnormal, removing')
-				continue
+	Y_train = np.zeros((max_length, pred_time_steps))	
+	Y_val = np.zeros((max_length, pred_time_steps))
+	Y_test = np.zeros((max_length, pred_time_steps))
 
-			if np.sum(y_p) / pred_time_steps < 0.01 or np.sum(y_p) / pred_time_steps > 0.99: # Get average value for y
-				print('Y mean value is abnormal, removing')
-				continue
+	split_pattern = [0, 1, 0, 2, 0]	# Train: 0, val: 1, test: 2
 
+	train_next_idx = 0
+	val_next_idx = 0
+	test_next_idx = 0
+
+	period_idx = 0
+	for t in range(len(n_df) - (hist_time_steps + pred_time_steps), 0, -(hist_time_steps + pred_time_steps)): # Iterate through time sections of the full dataset
+		time_period_df = n_df[t:t + (hist_time_steps + pred_time_steps)]	# Get time period from full df (dataframe)
+		period_split = split_pattern[period_idx%(len(split_pattern))]
+		period_idx+=1
+		print(period_split)
+
+		for sym in symbols:
+			sym_df = time_period_df[sym]
+			x_p = sym_df[:hist_time_steps].values
+			y_p = sym_df[hist_time_steps:]["Close"].values
+
+			# Filter data
 			if not np.isfinite(x_p).all():	# If not all the values are finite, don't add element
-				print('X element conains non finite value')
+				print('X element conains non finite value.')
 				continue
 
 			if not np.isfinite(y_p).all():	# If not all the values are finite, don't add element
-				print('Y element conains non finite value')
+				print('Y element conains non finite value.')
 				continue
 
-			count+=1
-			X[count] = x_p
-			Y[count] = y_p
+			if np.count_nonzero(x_p==0) > 0:
+				#print('X element contained zeros.')
+				continue
 
-	idx = len(X)
-	searching = True
-	n_empty = 0
-	n_full = 0
-	
-	while searching:
-		idx += -1
-		if np.count_nonzero(X[idx]) > 0 and np.count_nonzero(Y[idx]) > 0:
-			print('End Found: {}. Total expected sets: {}.'.format(idx, tot_elements))
-			X = X[:idx+1]
-			Y = Y[:idx+1]
-			searching = False
+			if np.count_nonzero(y_p==0) > 0:
+				print('Y element contained zeros')
+				continue
+
+			if np.sum(x_p) / (6 * hist_time_steps + 6 * pred_time_steps) < 0.005:	# Get average value for X
+				print('X mean value is abnormal, removing')
+				continue
+
+			if np.sum(y_p) / pred_time_steps < 0.005 or np.sum(y_p) / pred_time_steps > 0.99: # Get average value for y
+				print('Y mean value is abnormal, removing')
+				continue
+
+			if period_split == 0:	# Add to traing set
+				X_train[train_next_idx] = x_p
+				Y_train[train_next_idx] = y_p
+				train_next_idx+=1
+
+			if period_split == 1:	# Add to validation set
+				X_val[val_next_idx] = x_p
+				Y_val[val_next_idx] = y_p
+				val_next_idx+=1
+
+			if period_split == 2:	# Add to validation set
+				X_test[test_next_idx] = x_p
+				Y_test[test_next_idx] = y_p
+				test_next_idx+=1
 
 
-	X, Y = shuffle(X, Y)
-	train_frac = 0.6
-	val_frac = 0.2
-	X_train = X[:int(len(X) * train_frac)]
-	Y_train = Y[:int(len(Y) * train_frac)]
-	X_val = X[int(len(X) * train_frac) : int(len(X) * (train_frac + val_frac))]
-	Y_val = Y[int(len(Y) * train_frac) : int(len(Y) * (train_frac + val_frac))]
-	X_test = X[int(len(X) * (train_frac + val_frac)):]
-	Y_test = Y[int(len(Y) * (train_frac + val_frac)):]
+	X_train, Y_train = trim_zeros(X_train, Y_train)
+	X_val, Y_val = trim_zeros(X_val, Y_val)
+	X_test, Y_test = trim_zeros(X_test, Y_test)
 
+	X_train, Y_train = shuffle(X_train, Y_train)
+	X_val, Y_val = shuffle(X_val, Y_val)
+	X_test, Y_test = shuffle(X_test, Y_test)
 
 	hf = h5py.File(output_filename, 'w')
 	hf.create_dataset('X_train', data=X_train)
@@ -169,10 +161,10 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 
 	hf.close()
 
-	print('Done.')
+	print('Done. Process took {.2f} minutes and {} data elements were added.'.format((time.time() - start_time) / 60, len(X_train) + len(X_val) + len(X_test)))
 
 
-#create_hdf5(os.path.join('datasets', '90Day-part1-ffill.h5'), os.path.join('original_dfs','top10000-part1.h5'), hist_time_steps=90)
+#create_hdf5(os.path.join('datasets', '90Day-part1-parallel.h5'), os.path.join('original_dfs','top10000-part1.h5'), hist_time_steps=90)
 #df = pd.read_hdf('top10000-part1.h5', 'df')
 #df.to_csv('top10000-part1.csv')
 #sys.exit(0)
@@ -191,7 +183,7 @@ def load_data(filename):
 # 'Top-700-20-year-Swe-120Day.h5'	# New
 # 'Top-100-20-year.h5'
 # '700Swe-20Year-30Day.h5'		# New
-dataset = os.path.join('datasets', '90Day-part1-ffill.h5')
+dataset = os.path.join('datasets', '90Day-part1-parallel.h5')
 X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data(dataset)
 hist_time_steps = 90
 pred_time_steps = 7
@@ -223,15 +215,15 @@ def scalar_augment(X_elem, Y_elem, min_scalar=1, max_scalar=1):
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
 
-model = keras.models.load_model(os.path.join('models', 'new_data_modelMSE.h5'))
+#model = keras.models.load_model(os.path.join('models', 'new_data_modelMSE.h5'))
 
-#history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
-#	validation_data=(X_val, Y_val), epochs=40, callbacks=[reduce_lr, check])
+history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
+	validation_data=(X_val, Y_val), epochs=20, callbacks=[reduce_lr, check])
 
-#model.save(os.path.join('models', 'dual_aug.h5'))
+model.save(os.path.join('models', 'parallel.h5'))
 
-#with open(os.path.join('trainHistoryDict', 'mse_history.txt'), 'wb') as file_pi:
-#        pickle.dump(history.history, file_pi)
+with open(os.path.join('trainHistoryDict', 'mse_history.txt'), 'wb') as file_pi:
+        pickle.dump(history.history, file_pi)
 
 #sys.exit(0)
 
@@ -327,14 +319,14 @@ def evaluate(X_, Y_, n_):
 			elif avg_value_true - previous_close < 0:
 				tn+=1
 
-		if avg_value_pred/previous_close > 1.06:	# Predicted 2% increase
-			n_buy_predictions+=1
-			if avg_value_true/previous_close > 1.01:	# Stock actually went up 1%, therfore it could be considered a success
-				n_buy_correct+=1
-				accum_change_of_correct_buy+=avg_value_true/previous_close
+		if avg_value_pred / previous_close > 1.06:	# Predicted 6% increase
+			n_buy_predictions += 1
+			if avg_value_true / previous_close > 1.01:	# Stock actually went up 1%, therfore it could be considered a success
+				n_buy_correct += 1
+				accum_change_of_correct_buy += (avg_value_true/previous_close)/101	# Subtract courtage
 			else:	# All bought stocks that did not go up 1%
-				n_buy_incorrect+=1
-				accum_change_of_incorrect_buy+=avg_value_true/previous_close
+				n_buy_incorrect += 1
+				accum_change_of_incorrect_buy += (avg_value_true/previous_close)/101	# Subtract courtage
 
 
 	buy_accuracy = n_buy_correct/n_buy_predictions
@@ -348,8 +340,9 @@ def evaluate(X_, Y_, n_):
 
 #visualize2(X_val, Y_val, 5)
 
-#visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
+visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
+'''
 tp, tn, fp, fn = evaluate(X_val, Y_val, len(X_val)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
 									# 49.8% of stock data increased in price
 									# 50.1% of stock data decreased in price
@@ -358,7 +351,7 @@ Accuracy = (tp + tn)/(tp+tn+fp+fn)
 Percent_up = (tp + fn)/(tp+tn+fp+fn)
 Percent_down = (tn + fp)/(tp+tn+fp+fn)
 print('Taking the mean of prediction values and comparing that to the mean of the label values. \n Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset {} was: {}, Percent of stocks that went up: {}, percent of stocks that went down {}. TP: {}, TN: {}, FP:{}, FN: {}.'.format(dataset, Accuracy, Percent_up, Percent_down, tp, tn, fp, fn))
-
+'''
 
 
 # //TODO 
