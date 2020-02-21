@@ -35,6 +35,25 @@ class CustomSequence(Sequence):
 
 
 
+def trim_zeros(X_, Y_):
+	idx = len(X_)
+	searching = True
+	
+	X_out = []
+	Y_out = []
+	
+	while searching:
+		idx += -1
+		if np.count_nonzero(X_[idx]) > 0 and np.count_nonzero(Y_[idx]) > 0:
+			print('End Found at Index: {}.'.format(idx))
+			X_out = X_[:idx+1]
+			Y_out = Y_[:idx+1]
+			searching = False
+
+	return X_out, Y_out
+
+
+
 
 
 '''			TO ANALYZE THE TRAINING DATA
