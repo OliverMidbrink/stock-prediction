@@ -221,10 +221,10 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	print('Done. Process took {:.2f} minutes and {} data elements were added.'.format((time.time() - start_time) / 60, len(X_train) + len(X_val) + len(X_test)))
 
 
-create_hdf5(os.path.join('datasets', '90Day-to-2019-06-max_zero_hist_t_steps.h5'), os.path.join('original_dfs', 'to-2019-06-large.h5'), hist_time_steps=90)
+#create_hdf5(os.path.join('datasets', '90Day-to-2019-06-max_zero_hist_t_steps.h5'), os.path.join('original_dfs', 'to-2019-06-large.h5'), hist_time_steps=90)
 #df = pd.read_hdf('top10000-part1.h5', 'df')
 #df.to_csv('top10000-part1.csv')
-sys.exit(0)
+#sys.exit(0)
 
 def load_data(filename):
 	hf = h5py.File(filename, 'r')
@@ -350,6 +350,7 @@ def evaluate(X_, Y_, n_):
 	accum_purchase = 0 # Accum, previous close
 	accum_stock_trans_cost = 0 # Total transaction costs
 	accum_dev_mean = 0	# Mean of true value (label) accumulated, 7 days in some cases
+	mean_all_stock_ROI = 0 # How did the "market" change during this period
 
 	disp_count=0
 	for x in range(n_):
@@ -380,6 +381,7 @@ def evaluate(X_, Y_, n_):
 			elif avg_value_true - previous_close < 0:
 				tn+=1
 
+		mean_all_stock_ROI += (avg_value_true - previous_close) / previous_close / n_
 		if avg_value_pred / previous_close > 1.06:	# Predicted 6% increase
 			n_buy_predictions += 1
 			accum_purchase += previous_close	# Buy stock at opening the next day, which would be similar to close at prediction day.
@@ -399,7 +401,7 @@ def evaluate(X_, Y_, n_):
 	mean_change_incorrect_buy = accum_change_of_incorrect_buy / n_buy_incorrect
 
 	ROI = (accum_dev_mean - accum_purchase - accum_stock_trans_cost) / (accum_purchase + accum_stock_trans_cost)
-	msg = 'True Positive: {}, TN {}, FP {}, FN {}. Buy Accuracy {}. n_buy {}, n_buy_correct {}, Mean_change_of_stocks_up_1% {}, Mean_not_up_1% {}.\nROI: {}. Result true mean of (pred_days): {}, purchase: {}, trans_cost {}.'.format(tp, tn, fp, fn, buy_accuracy, n_buy_predictions, n_buy_correct, mean_change_correct_buy, mean_change_incorrect_buy, ROI, accum_dev_mean, accum_purchase, accum_stock_trans_cost)
+	msg = 'Market change: {}. Buy Accuracy {}. n_buy {}, n_buy_correct {}, Mean_change_of_stocks_up_1% {}, Mean_not_up_1% {}.\nROI: {}. Result true mean of (pred_days): {}, purchase: {}, trans_cost {}.'.format(mean_all_stock_ROI, buy_accuracy, n_buy_predictions, n_buy_correct, mean_change_correct_buy, mean_change_incorrect_buy, ROI, accum_dev_mean, accum_purchase, accum_stock_trans_cost)
 	return (tp, tn, fp, fn), msg
 
 
@@ -407,10 +409,10 @@ def evaluate(X_, Y_, n_):
 
 #visualize2(X_val, Y_val, 5)
 
-#visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
+visualize3(X_test, Y_test, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
 
-(tp, tn, fp, fn), msg = evaluate(X_val, Y_val, len(X_val)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
+(tp, tn, fp, fn), msg = evaluate(X_test, Y_test, len(X_test)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
 									# 49.8% of stock data increased in price
 									# 50.1% of stock data decreased in price
 
