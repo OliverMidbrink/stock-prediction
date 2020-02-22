@@ -53,3 +53,19 @@ ROI: -0.008755602656592814. Result true mean of (pred_days): 21.83707728867912, 
 Taking the mean of prediction values and comparing that to the mean of the label values. 
  Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-parallel.h5 was: 0.5576144244105409, Percent of stocks that went up: 0.5390846047156727, percent of stocks that went down 0.46091539528432734. TP: 5886, TN: 4165, FP:4143, FN: 3831.
 
+11) Validation data, buy when predicted > 3% up at highest pred day. Sell at that day. Market change: 0.06165314726834806. Buy Accuracy 0.5306582506762849. n_buy 2218, n_buy_correct 1177, Mean_change_of_stocks_up_1% 1.0545775653412195, Mean_not_up_1% 2.0451765173333216.
+ROI: 0.009998164493925018. Result true mean of (pred_days): 234.41291141447232, purchase: 229.79446860259472, trans_cost 2.2979446860259416.
+Taking the mean of prediction values and comparing that to the mean of the label values. 
+ Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-parallel.h5 was: 0.5178737614277111, Percent of stocks that went up: 0.4804839327749494, percent of stocks that went down 0.5195160672250506. TP: 4302, TN: 5158, FP:4332, FN: 4475.
+
+12) Validation data, buy when > 6% -11-.Evaluation after creating and training on the parallel dataset. Best out of 20 epochs.
+Market change: 0.0616531472683481. Buy Accuracy 0.5468025949953661. n_buy 1079, n_buy_correct 590, Mean_change_of_stocks_up_1% 1.066153046958708, Mean_not_up_1% 3.2623247433617553.
+ROI: 0.024604131283662466. Result true mean of (pred_days): 64.90367727145927, purchase: 62.71794602750288, trans_cost 0.6271794602750287.
+Taking the mean of prediction values and comparing that to the mean of the label values. 
+ Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-parallel.h5 was: 0.5178737614277111, Percent of stocks that went up: 0.4804839327749494, percent of stocks that went down 0.5195160672250506. TP: 4302, TN: 5158, FP:4332, FN: 4475.
+
+13) Random sell: Evaluation after creating and training on the parallel dataset. Best out of 20 epochs.
+Market change: 0.06165314726834821. Buy Accuracy 0.4522706209453197. n_buy 1079, n_buy_correct 488, Mean_change_of_stocks_up_1% 3.367973546938225, Mean_not_up_1% 0.9826328363852456.
+ROI: 0.022907436950134804. Result true mean of (pred_days): 64.79619995598749, purchase: 62.71794602750281, trans_cost 0.6271794602750297.
+Taking the mean of prediction values and comparing that to the mean of the label values. 
+ Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-parallel.h5 was: 0.5178737614277111, Percent of stocks that went up: 0.4804839327749494, percent of stocks that went down 0.5195160672250506. TP: 4302, TN: 5158, FP:4332, FN: 4475.
