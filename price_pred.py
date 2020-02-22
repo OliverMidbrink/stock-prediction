@@ -18,31 +18,55 @@ if platform.system() == 'Windows':
 '''
 import requests
 from bs4 import BeautifulSoup
-symbols_list = set([])
+symbols_set = set([])
 symbols_text = ""
-for n_page in range(40):
+for n_page in range(160):
 	print('Page {}'.format(n_page))
 	# URL FOR MID-LARGE CAP INT. url = 'https://finance.yahoo.com/screener/unsaved/2d100c4f-9eab-403f-ab91-8de0b917e380?offset={}&count=100'.format(n_page * 100)
-	url = 'https://finance.yahoo.com/screener/unsaved/758d0d96-0a87-4cf9-ada9-9f8d77f87ae5?count=100&offset={}'.format(n_page*100)
+	url = 'https://finance.yahoo.com/screener/unsaved/7e03632f-b9e5-469d-afb7-25d18aa8e444?count=100&offset={}'.format(n_page*100)
 	page = requests.get(url)
 	soup = BeautifulSoup(page.content, 'html.parser')
 
 	sym_tags = soup.find_all('a', {'class':'Fw(600)'})
 
 	for sym in sym_tags:
-		symbols_list.add(sym.text)
+		symbols_set.add(sym.text)
 
-for sym in symbols_list:
+for sym in symbols_set:
 	if len(sym)<1:
-		print('Empty sym text')
-		continue
+		symbols_set.remove("")
 	symbols_text += sym + " "
 
+print('Number of symbols is: {}.'.format(len(symbols_set)))
+with open(os.path.join('original_dfs', 'symbols.txt'), 'w') as f:
+	f.write(symbols_text)
 
 	# --- Download and Save ---
-df = yf.download(symbols_text, start="2000-01-01", end="2020-02-10")
-df.to_hdf(os.path.join('original_dfs', 'top10000-part1.h5'), 'df', mode='w', format='fixed')
+symbols_list = list(symbols_set)
+start_date = "2000-01-01"
+end_date = "2019-06-01"
+batch_size = 100
+df_list = [None] * int(len(symbols_list)/batch_size + 1)
 
+idx = -1 
+for x in range(0, len(symbols_list), batch_size):
+	idx += 1
+	to_download = ""
+	for sym in symbols_list[x:x+batch_size]:
+		to_download += sym + " "
+
+	print('{} Symbols have been iterated. Downloading {} additional symbols.'.format(x, len(symbols_list[x:x+batch_size])))
+	try:
+		df_list[idx] = yf.download(to_download, start=start_date, end=end_date)
+	except Exception as e:
+		print(e)
+	print('Done.')
+
+full_df = pd.concat(df_list, axis=1, sort=False)
+full_df.to_hdf(os.path.join('original_dfs', 'to-2019-06-large.h5'), 'df', mode='w', format='fixed')
+
+df = pd.read_hdf(os.path.join('original_dfs', 'to-2019-06-large.h5'), 'df')
+#df.to_csv(os.path.join('original_dfs', 'to-2019-06-large.csv'))
 sys.exit(0)
 '''
 
