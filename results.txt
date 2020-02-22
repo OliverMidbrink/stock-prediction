@@ -39,3 +39,9 @@ True Positive: 4302, TN 5158, FP 4332, FN 4475. Buy Accuracy 0.47131782945736433
 ROI: 0.1197777674195936. Result true mean of (pred_days): 32.02290402778555, purchase: 28.31440888947776, trans_cost 0.28314408889477727.
 Taking the mean of prediction values and comparing that to the mean of the label values. 
  Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-parallel.h5 was: 0.5178737614277111, Percent of stocks that went up: 0.4804839327749494, percent of stocks that went down 0.5195160672250506. TP: 4302, TN: 5158, FP:4332, FN: 4475.
+
+9) Parallel Test Data with 01020 period split. Evaluation after creating and training on the parallel dataset. Best out of 20 epochs.
+Market change: 0.0041529879928968215. Buy Accuracy 0.42727272727272725. n_buy 550, n_buy_correct 235, Mean_change_of_stocks_up_1% 1.0839680317504812, Mean_not_up_1% 0.9408622670348341.
+ROI: 0.1204345784571103. Result true mean of (pred_days): 24.683132184403267, purchase: 21.811844445827624, trans_cost 0.21811844445827655.
+Taking the mean of prediction values and comparing that to the mean of the label values. 
+ Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-parallel.h5 was: 0.5576144244105409, Percent of stocks that went up: 0.5390846047156727, percent of stocks that went down 0.46091539528432734. TP: 5886, TN: 4165, FP:4143, FN: 3831.

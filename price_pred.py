@@ -427,7 +427,7 @@ print('Taking the mean of prediction values and comparing that to the mean of th
 
 
 # //TODO 
-# 1. Divide up the train, val and test data so that none overlap. 
+# 1.  Change sell method, try selling at the highest predicted day.
 	# Make an array of all the change and explore that. For instance the
 	# standard deviation of each pred_time_step. This is useful to show the 
 	# uncertainty in the data. 
