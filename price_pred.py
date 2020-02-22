@@ -382,12 +382,13 @@ def evaluate(X_, Y_, n_):
 				tn+=1
 
 		mean_all_stock_ROI += (avg_value_true - previous_close) / previous_close / n_
-		if avg_value_pred / previous_close > 1.06:	# Predicted 6% increase
+		
+		if pred[np.argmax(pred)] / previous_close > 1.03:	# Decides to purchase stock
 			n_buy_predictions += 1
 			accum_purchase += previous_close	# Buy stock at opening the next day, which would be similar to close at prediction day.
 			accum_stock_trans_cost += previous_close * 0.01	# Counting on 1% transaction fee
-			accum_dev_mean += avg_value_pred
-
+			accum_dev_mean += true[np.argmax(pred)]	# Sell at highest predicted day, therefore development is the pred_high day - previous close
+			# Could sell 
 			if avg_value_true / previous_close > 1.01:	# Stock actually went up 1%, therfore it could be considered a success
 				n_buy_correct += 1
 				accum_change_of_correct_buy += avg_value_true/previous_close
@@ -409,7 +410,7 @@ def evaluate(X_, Y_, n_):
 
 #visualize2(X_val, Y_val, 5)
 
-visualize3(X_test, Y_test, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
+#visualize3(X_test, Y_test, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
 
 (tp, tn, fp, fn), msg = evaluate(X_test, Y_test, len(X_test)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
@@ -427,7 +428,8 @@ print('Taking the mean of prediction values and comparing that to the mean of th
 
 
 # //TODO 
-# 1.  Change sell method, try selling at the highest predicted day.
+# 1.  Change buy and sell method, try selling at the highest predicted day, buying if that day is higher than threshold.
+	# Maybe make a probability distribution similar to the pred array. 
 	# Make an array of all the change and explore that. For instance the
 	# standard deviation of each pred_time_step. This is useful to show the 
 	# uncertainty in the data. 
