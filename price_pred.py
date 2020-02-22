@@ -107,6 +107,23 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	Y_test = np.zeros((max_length, pred_time_steps))
 
 	split_pattern = [0, 1, 0, 2, 0]	# Train: 0, val: 1, test: 2
+	
+	n_periods = int((len(n_df) - (hist_time_steps + pred_time_steps)) / (hist_time_steps + pred_time_steps)) + 1
+
+
+	split_pattern = [0] * n_periods
+	val_idx = int(n_periods * 0.8)
+	split_pattern[val_idx:] = [1] * (len(split_pattern) - val_idx)
+
+	test_idx = int(n_periods * 0.9)
+	split_pattern[test_idx:] = [2] * (len(split_pattern) - test_idx)
+
+	# DEBUG
+	n_x_non_finite = 0
+	n_y_non_finite = 0
+	n_x_contain_zero = 0 
+	n_y_contain_zero = 0
+	n_elements = 0
 
 	train_next_idx = 0
 	val_next_idx = 0
@@ -117,28 +134,38 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 		time_period_df = n_df[t:t + (hist_time_steps + pred_time_steps)]	# Get time period from full df (dataframe)
 		period_split = split_pattern[period_idx%(len(split_pattern))]
 		period_idx+=1
-		print(period_split)
+
+		per_n_x_non_finite = n_x_non_finite
+		per_n_y_non_finite = n_y_non_finite
+		per_n_x_contain_zero = n_x_contain_zero
+		per_n_y_contain_zero = n_y_contain_zero
+		per_n_elements = n_elements
 
 		for sym in symbols:
 			sym_df = time_period_df[sym]
 			x_p = sym_df[:hist_time_steps].values
 			y_p = sym_df[hist_time_steps:]["Close"].values
+			n_elements+=1
 
 			# Filter data
 			if not np.isfinite(x_p).all():	# If not all the values are finite, don't add element
-				print('X element conains non finite value.')
+				#print('X element conains non finite value.')
+				n_x_non_finite+=1
 				continue
 
 			if not np.isfinite(y_p).all():	# If not all the values are finite, don't add element
-				print('Y element conains non finite value.')
+				#print('Y element conains non finite value.')
+				n_y_non_finite+=1
 				continue
 
-			if np.count_nonzero(x_p==0) > 0:
+			if np.count_nonzero(x_p==0) > hist_time_steps:
 				#print('X element contained zeros.')
+				n_x_contain_zero+=1
 				continue
 
 			if np.count_nonzero(y_p==0) > 0:
-				print('Y element contained zeros')
+				#print('Y element contained zeros')
+				n_y_contain_zero+=1
 				continue
 
 			if np.sum(x_p) / (6 * hist_time_steps + 6 * pred_time_steps) < 0.005:	# Get average value for X
@@ -164,7 +191,13 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 				Y_test[test_next_idx] = y_p
 				test_next_idx+=1
 
+		print('Running average. Non finite X, Y: {}, {}. Elements that contained too many zeros: {}, {}'.format(
+			(n_x_non_finite - per_n_x_non_finite) / (n_elements - per_n_elements), (n_y_non_finite - per_n_y_non_finite) / (n_elements - per_n_elements), 
+			(n_x_contain_zero - per_n_x_contain_zero) / (n_elements - per_n_elements), (n_y_contain_zero - per_n_y_contain_zero) / (n_elements - per_n_elements)))
+		print('{:0.4f}% of periods completed'.format(period_idx/n_periods * 100))
 
+	print('Filtered. Non finite X, Y: {}, {}. Elements that contained too many zeros: {}, {}'.format(n_x_non_finite / n_elements, n_y_non_finite / n_elements, n_x_contain_zero / n_elements, n_y_contain_zero / n_elements))
+	
 	X_train, Y_train = trim_zeros(X_train, Y_train)
 	X_val, Y_val = trim_zeros(X_val, Y_val)
 	X_test, Y_test = trim_zeros(X_test, Y_test)
@@ -185,13 +218,13 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 
 	hf.close()
 
-	print('Done. Process took {.2f} minutes and {} data elements were added.'.format((time.time() - start_time) / 60, len(X_train) + len(X_val) + len(X_test)))
+	print('Done. Process took {:.2f} minutes and {} data elements were added.'.format((time.time() - start_time) / 60, len(X_train) + len(X_val) + len(X_test)))
 
 
-#create_hdf5(os.path.join('datasets', '90Day-part1-parallel.h5'), os.path.join('original_dfs','top10000-part1.h5'), hist_time_steps=90)
+create_hdf5(os.path.join('datasets', '90Day-to-2019-06-max_zero_hist_t_steps.h5'), os.path.join('original_dfs', 'to-2019-06-large.h5'), hist_time_steps=90)
 #df = pd.read_hdf('top10000-part1.h5', 'df')
 #df.to_csv('top10000-part1.csv')
-#sys.exit(0)
+sys.exit(0)
 
 def load_data(filename):
 	hf = h5py.File(filename, 'r')
