@@ -334,7 +334,6 @@ def visualize3(X_, Y_, hist_time_steps=30, pred_time_steps=7, start=0):
 
 	plt.show()
 
-
 def evaluate(X_, Y_, n_):
 	idx_total = set(range(len(X_)-1))
 
@@ -407,7 +406,6 @@ def evaluate(X_, Y_, n_):
 	msg = 'Market change: {}. Buy Accuracy {}. n_buy {}, n_buy_correct {}, Mean_change_of_stocks_up_1% {}, Mean_not_up_1% {}.\nROI: {}. Result true mean of (pred_days): {}, purchase: {}, trans_cost {}.'.format(mean_all_stock_ROI, buy_accuracy, n_buy_predictions, n_buy_correct, mean_change_correct_buy, mean_change_incorrect_buy, ROI, accum_dev_mean, accum_purchase, accum_stock_trans_cost)
 	return (tp, tn, fp, fn), msg
 
-
 def visualize4(X_, Y_, hist_time_steps=30, pred_time_steps=7, start=0):
 	fig1, f1_axes = plt.subplots(ncols=7, nrows=7, sharex='col', tight_layout=True)
 	idx_total = set(range(len(X_)-1))
@@ -454,7 +452,7 @@ def evaluate2(X_, Y_, n_):
 	mean_all_stock_ROI = 0 # How did the "market" change during this period
 
 	error_arr = np.zeros((n_, len(Y_[0])))
-	roi_arr = np.zeros((n_, 1 + 6))	# Columns: ROI buy and sell last day (all stocks), ROI strategy 1, ROI strategy 2 ...
+	roi_arr = np.zeros((n_, 1 + 9))	# Columns: ROI buy and sell last day (all stocks), ROI strategy 1, ROI strategy 2 ...
 
 	disp_count=0
 	for x in range(n_):
@@ -480,24 +478,34 @@ def evaluate2(X_, Y_, n_):
 
 		# --- PURCHASING STRATEGIES ---
 		max_accuracy_day = np.argmin(model_std_error)
-		if pred[max_accuracy_day] / previous_close > 1.02:	# "Buy" stock
-			roi_arr[x][1] = (true[max_accuracy_day] - previous_close * 1.01) / (previous_close * 1.01)
+		if pred[max_accuracy_day] / previous_close > 1.03:	# "Buy" stock
+			roi_arr[x][1] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
 		
 		if pred[max_accuracy_day] / previous_close > 1.04:	# "Buy" stock
-			roi_arr[x][2] = (true[max_accuracy_day] - previous_close * 1.01) / (previous_close * 1.01)
+			roi_arr[x][2] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
 		
 		if pred[max_accuracy_day] / previous_close > 1.06:	# "Buy" stock
-			roi_arr[x][3] = (true[max_accuracy_day] - previous_close * 1.01) / (previous_close * 1.01)
+			roi_arr[x][3] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
 
 
-		if pred[max_accuracy_day] / previous_close > 1.02:	# Sell at last day
+		if pred[max_accuracy_day] / previous_close > 1.07:	# Sell at last day
 			roi_arr[x][4] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
 		
-		if pred[max_accuracy_day] / previous_close > 1.04:
+		if pred[max_accuracy_day] / previous_close > 1.08:
 			roi_arr[x][5] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
 		
-		if pred[max_accuracy_day] / previous_close > 1.06:
+		if pred[max_accuracy_day] / previous_close > 1.09:
 			roi_arr[x][6] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
+
+
+		if np.mean(pred[1:4]) / previous_close > 1.04:	# Sell at last day
+			roi_arr[x][7] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
+		
+		if np.mean(pred[1:4]) / previous_close > 1.05:
+			roi_arr[x][8] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
+		
+		if np.mean(pred[1:4]) / previous_close > 1.06:
+			roi_arr[x][9] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
 
 	mean_roi_arr = np.true_divide(roi_arr.sum(0), (roi_arr!=0).sum(0))
 
@@ -513,7 +521,7 @@ def evaluate2(X_, Y_, n_):
 #visualize4(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
 
-std_arr, mean_arr, mean_roi_arr, roi_arr = evaluate2(X_val, Y_val, 2000)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
+std_arr, mean_arr, mean_roi_arr, roi_arr = evaluate2(X_test, Y_test, len(X_test)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
 									# 49.8% of stock data increased in price
 									# 50.1% of stock data decreased in price
 print(std_arr)
@@ -523,8 +531,8 @@ n_per_method = (roi_arr!=0).sum(0)
 n_per_method[0] = 0
 
 fig, ax = plt.subplots(figsize=(6,4))
-ax.plot(range(7), std_arr)
-ax.plot(range(7), mean_arr)
+ax.plot(std_arr)
+ax.plot(mean_arr)
 ax.plot(mean_roi_arr)
 ax2 = ax.twinx()
 ax2.plot(n_per_method, color='tab:purple')
@@ -536,11 +544,7 @@ plt.show()
 
 
 # //TODO 
-# 1.  Add method to try out and visualize different buy/sell strategies
-	# Maybe make a probability distribution similar to the pred array. 
-	# Make an array of all the change and explore that. For instance the
-	# standard deviation of each pred_time_step. This is useful to show the 
-	# uncertainty in the data. 
+# 1.  Try creating a rolling train dataset.
 # 2. 
 # 3. Reinforcement learning?
 
