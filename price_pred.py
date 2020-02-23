@@ -273,8 +273,9 @@ def scalar_augment(X_elem, Y_elem, min_scalar=1, max_scalar=1):
 
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
-
-model = keras.models.load_model(os.path.join('checkpoints', 'weights-improvement-18-0.000434.h5'))
+model_file_name = os.path.join('checkpoints', 'weights-improvement-18-0.000434.h5')
+model_std_error = np.array([0.13822494, 0.0556501, 0.06061455, 0.07248468, 0.11877861, 0.08394475, 0.09361661])	# Inaccuracy based on train data
+model = keras.models.load_model(model_file_name)
 
 #history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
 #	validation_data=(X_val, Y_val), epochs=20, callbacks=[reduce_lr, check])
@@ -318,6 +319,7 @@ def visualize3(X_, Y_, hist_time_steps=30, pred_time_steps=7, start=0):
 			index = random.sample(idx_total, 1)[0]
 			idx_total.remove(index)
 
+			previous_close = X_[index][-1][1]
 			pred = model.predict(np.array([X_[index]]))
 			y = np.array([None]*(hist_time_steps + pred_time_steps))		# y values of graph
 
@@ -329,18 +331,16 @@ def visualize3(X_, Y_, hist_time_steps=30, pred_time_steps=7, start=0):
 
 			f1_axes[row][col].plot(range(hist_time_steps + pred_time_steps), y)
 			f1_axes[row][col].plot(range(hist_time_steps + pred_time_steps), np.append([None] * hist_time_steps, pred[0]))
+			f1_axes[row][col].plot(range(hist_time_steps + pred_time_steps), np.append([None] * hist_time_steps, pred[0] + model_std_error * previous_close))
+			f1_axes[row][col].plot(range(hist_time_steps + pred_time_steps), np.append([None] * hist_time_steps, pred[0] - model_std_error * previous_close))
 			f1_axes[row][col].axvline(x=(hist_time_steps-0.5))
 
 
 	plt.show()
 
-def evaluate(X_, Y_, n_):
+def evaluate2(X_, Y_, n_):
+	print('Evaluating {} random samples.'.format(n_))
 	idx_total = set(range(len(X_)-1))
-
-	tp=0
-	tn=0
-	fp=0
-	fn=0
 
 	n_buy_correct = 0
 	n_buy_predictions = 0
@@ -352,11 +352,14 @@ def evaluate(X_, Y_, n_):
 	accum_dev_mean = 0	# Mean of true value (label) accumulated, 7 days in some cases
 	mean_all_stock_ROI = 0 # How did the "market" change during this period
 
+	error_arr = np.zeros((n_, len(Y_[0])))
+	roi_arr = np.zeros((n_, 1 + 6))	# Columns: ROI buy and sell last day (all stocks), ROI strategy 1, ROI strategy 2 ...
+
 	disp_count=0
 	for x in range(n_):
 		disp_count+=1
-		if disp_count % 1000 == 0:
-			print('{:.3f} percent evaluated.'.format(x/n_*100))
+		if disp_count % 500 == 0:
+			print('{:.2f} percent evaluated.'.format(x/n_*100))
 		i = random.sample(idx_total, 1)[0]
 		idx_total.remove(i)
 
@@ -364,68 +367,71 @@ def evaluate(X_, Y_, n_):
 		pred = model.predict(np.array([X_[i]]))[0]
 		true = Y_[i]
 
-		avg_value_pred = 0	# How will the true and pred stock prices differ from the last close price in X
-		avg_value_true = 0
+		mean_value_pred = 0	# How will the true and pred stock prices differ from the last close price in X
+		mean_value_true = 0
 		for j in range(len(pred)):
-			avg_value_true+=true[j]/len(true)
-			avg_value_pred+=pred[j]/len(pred)
+			mean_value_true+=true[j]/len(true)
+			mean_value_pred+=pred[j]/len(pred)
 
-		if avg_value_pred - previous_close >= 0:
-			if avg_value_true - previous_close >= 0:
-				tp+=1
-			elif avg_value_true - previous_close < 0:
-				fp+=1
-		else:
-			if avg_value_true - previous_close >= 0:
-				fn+=1
-			elif avg_value_true - previous_close < 0:
-				tn+=1
+			error_arr[x][j] = (pred[j] - true[j]) / previous_close	# Error in relation to previous close
 
-		mean_all_stock_ROI += (avg_value_true - previous_close) / previous_close / n_
+		roi_arr[x][0] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)	# How did the stock change over the pred period (taking trans fee into account)
+
+		# --- PURCHASING STRATEGIES ---
+		max_accuracy_day = np.argmin(model_std_error)
+		if pred[max_accuracy_day] / previous_close > 1.02:	# "Buy" stock
+			roi_arr[x][1] = (true[max_accuracy_day] - previous_close * 1.01) / (previous_close * 1.01)
 		
-		if pred[np.argmax(pred)] / previous_close > 1.07:	# Decides to purchase stock
-			n_buy_predictions += 1
-			accum_purchase += previous_close	# Buy stock at opening the next day, which would be similar to close at prediction day.
-			accum_stock_trans_cost += previous_close * 0.01	# Counting on 1% transaction fee
-			sell_price = true[-1] # Sell at last random day
-			accum_dev_mean += sell_price
-
-			if sell_price / previous_close > 1.01:	# Stock actually went up 1%, therfore it could be considered a success
-				n_buy_correct += 1
-				accum_change_of_correct_buy += sell_price/previous_close
-			else:	# All bought stocks that did not go up 1%
-				n_buy_incorrect += 1
-				accum_change_of_incorrect_buy += sell_price/previous_close
+		if pred[max_accuracy_day] / previous_close > 1.04:	# "Buy" stock
+			roi_arr[x][2] = (true[max_accuracy_day] - previous_close * 1.01) / (previous_close * 1.01)
+		
+		if pred[max_accuracy_day] / previous_close > 1.06:	# "Buy" stock
+			roi_arr[x][3] = (true[max_accuracy_day] - previous_close * 1.01) / (previous_close * 1.01)
 
 
-	buy_accuracy = n_buy_correct/n_buy_predictions
-	mean_change_correct_buy = accum_change_of_correct_buy / n_buy_correct
-	mean_change_incorrect_buy = accum_change_of_incorrect_buy / n_buy_incorrect
+		if pred[max_accuracy_day] / previous_close > 1.02:	# Sell at last day
+			roi_arr[x][4] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
+		
+		if pred[max_accuracy_day] / previous_close > 1.04:
+			roi_arr[x][5] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
+		
+		if pred[max_accuracy_day] / previous_close > 1.06:
+			roi_arr[x][6] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
 
-	ROI = (accum_dev_mean - accum_purchase - accum_stock_trans_cost) / (accum_purchase + accum_stock_trans_cost)
-	msg = 'Market change: {}. Buy Accuracy {}. n_buy {}, n_buy_correct {}, Mean_change_of_stocks_up_1% {}, Mean_not_up_1% {}.\nROI: {}. Result true mean of (pred_days): {}, purchase: {}, trans_cost {}.'.format(mean_all_stock_ROI, buy_accuracy, n_buy_predictions, n_buy_correct, mean_change_correct_buy, mean_change_incorrect_buy, ROI, accum_dev_mean, accum_purchase, accum_stock_trans_cost)
-	return (tp, tn, fp, fn), msg
+	mean_roi_arr = np.true_divide(roi_arr.sum(0), (roi_arr!=0).sum(0))
+
+	std_error_arr = np.std(error_arr, axis=0)
+	mean_error_arr = np.mean(error_arr, axis=0)
+	return std_error_arr, mean_error_arr, mean_roi_arr, roi_arr
 
 
 
 
 #visualize2(X_val, Y_val, 5)
 
-#visualize3(X_test, Y_test, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
+#visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
 
-(tp, tn, fp, fn), msg = evaluate(X_val, Y_val, len(X_val)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
+std_arr, mean_arr, mean_roi_arr, roi_arr = evaluate2(X_val, Y_val, 2000)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
 									# 49.8% of stock data increased in price
 									# 50.1% of stock data decreased in price
+print(std_arr)
+print(mean_arr)
+print('Mean ROI array: {}'.format(mean_roi_arr))
+n_per_method = (roi_arr!=0).sum(0)
+n_per_method[0] = 0
 
-Accuracy = (tp + tn)/(tp+tn+fp+fn)
-Percent_up = (tp + fn)/(tp+tn+fp+fn)
-Percent_down = (tn + fp)/(tp+tn+fp+fn)
-
-print('Evaluation after creating and training on the parallel dataset. Best out of 20 epochs.') # Put description here before evaluating
-print(msg)
-print('Taking the mean of prediction values and comparing that to the mean of the label values. \n Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset {} was: {}, Percent of stocks that went up: {}, percent of stocks that went down {}. TP: {}, TN: {}, FP:{}, FN: {}.'.format(dataset, Accuracy, Percent_up, Percent_down, tp, tn, fp, fn))
-
+fig, ax = plt.subplots(figsize=(6,4))
+ax.plot(range(7), std_arr)
+ax.plot(range(7), mean_arr)
+ax.plot(mean_roi_arr)
+ax2 = ax.twinx()
+ax2.plot(n_per_method, color='tab:purple')
+ax.set_xlabel('Prediction day index and Method index')
+ax.set_ylabel('STD (Blue), Mean Error (Orange) and Mean ROI per Method (Green)', fontsize=7)
+ax2.set_ylabel('Number of purchases for each method', color='tab:purple')
+ax2.tick_params(axis='y', labelcolor='tab:purple')
+plt.show()
 
 
 # //TODO 
