@@ -1,4 +1,5 @@
 original_dfs/
 datasets/
+checkpoints/to-2019-06-checkpoints/
 .DS_Store
 __pycache__/
