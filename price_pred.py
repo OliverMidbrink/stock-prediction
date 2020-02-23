@@ -242,22 +242,22 @@ def load_data(filename):
 # 'Top-700-20-year-Swe-120Day.h5'
 # 'Top-100-20-year.h5'
 # '700Swe-20Year-30Day.h5'		
-dataset = os.path.join('datasets', '90Day-part1-parallel.h5')
+dataset = os.path.join('datasets', '90Day-to-2019-06-max_zero_hist_t_steps.h5')
 X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data(dataset)
 hist_time_steps = 90
 pred_time_steps = 7
 
 	# --- Model ---
 model = keras.models.Sequential()
-model.add(keras.layers.GRU(120, return_sequences=True, input_shape=(None,6)))	# None for any number of timesteps
-model.add(keras.layers.GRU(120, return_sequences=True))	# None for any number of timesteps
-model.add(keras.layers.GRU(60, return_sequences=False))
-model.add(keras.layers.Dense(60))
-model.add(keras.layers.Dropout(0.1))
+model.add(keras.layers.GRU(120, return_sequences=True, input_shape=(None,6), reset_after = True, recurrent_activation='sigmoid'))	# None for any number of timesteps
+model.add(keras.layers.GRU(120, return_sequences=True, reset_after = True, recurrent_activation='sigmoid'))	# None for any number of timesteps
+model.add(keras.layers.GRU(70, return_sequences=False, reset_after = True, recurrent_activation='sigmoid'))
+model.add(keras.layers.Dense(70))
+model.add(keras.layers.Dropout(0.15))
 model.add(keras.layers.Dense(pred_time_steps))
 
 
-filepath = os.path.join('checkpoints', 'weights-improvement-{epoch:02d}-{val_loss:.6f}.h5')
+filepath = os.path.join('checkpoints', 'to-2019-06-checkpoints', 'weights-improvement-{epoch:02d}-{val_loss:.6f}.h5')
 check = keras.callbacks.callbacks.ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='min', period=1)
 reduce_lr = keras.callbacks.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor=0.5, verbose=1, patience=3, min_lr = 0.00001)
 
@@ -267,25 +267,25 @@ model.summary()
 
 
 def scalar_augment(X_elem, Y_elem, min_scalar=1, max_scalar=1):
-	scalar = min_scalar + random.random() * (max_scalar - min_scalar)
+	#scalar = min_scalar + random.random() * (max_scalar - min_scalar)
 	#noise = np.random.normal(0, 0.001, X_elem.shape)
-	return X_elem * scalar, Y_elem * scalar
+	return X_elem, Y_elem
 
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
-model_file_name = os.path.join('checkpoints', 'weights-improvement-18-0.000434.h5')
-model_std_error = np.array([0.13822494, 0.0556501, 0.06061455, 0.07248468, 0.11877861, 0.08394475, 0.09361661])	# Inaccuracy based on train data
-model = keras.models.load_model(model_file_name)
+#model_file_name = os.path.join('checkpoints', 'weights-improvement-18-0.000434.h5')
+#model_std_error = np.array([0.13822494, 0.0556501, 0.06061455, 0.07248468, 0.11877861, 0.08394475, 0.09361661])	# Inaccuracy based on train data
+#model = keras.models.load_model(model_file_name)
 
-#history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
-#	validation_data=(X_val, Y_val), epochs=20, callbacks=[reduce_lr, check])
+history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
+	validation_data=(X_val, Y_val), epochs=20, callbacks=[reduce_lr, check])
 
 #model.save(os.path.join('models', 'parallel.h5'))
 
-#with open(os.path.join('trainHistoryDict', 'mse_history.txt'), 'wb') as file_pi:
-#        pickle.dump(history.history, file_pi)
+with open(os.path.join('trainHistoryDict', 'to-2019-06_history.txt'), 'wb') as file_pi:
+        pickle.dump(history.history, file_pi)
 
-#sys.exit(0)
+sys.exit(0)
 
 
 def visualize2(X_, Y_, n_plots=2):
@@ -521,7 +521,7 @@ def evaluate2(X_, Y_, n_):
 #visualize4(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
 
-std_arr, mean_arr, mean_roi_arr, roi_arr = evaluate2(X_test, Y_test, len(X_test)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
+std_arr, mean_arr, mean_roi_arr, roi_arr = evaluate2(X_train, Y_train, len(X_train)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
 									# 49.8% of stock data increased in price
 									# 50.1% of stock data decreased in price
 print(std_arr)
