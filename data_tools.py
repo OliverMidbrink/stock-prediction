@@ -1,12 +1,37 @@
 from tensorflow.python.keras.utils.data_utils import Sequence
 import numpy as np
 import random
+import pandas as pd
+import yfinance as yf
 
 '''
 def scalar_augment(X_, min_scalar=0.5, max_scalar=2):
 	scalar = min_scalar + random.random() * (max_scalar - min_scalar)
 	return X_ * scalar
 '''
+def download_symbols(symbols_list, start_date, end_date):
+	start_date = "2019-06-02"
+	end_date = "2020-02-23"
+	batch_size = 100
+	df_list = [None] * int(len(symbols_list)/batch_size + 1)
+
+	idx = -1 
+	for x in range(0, len(symbols_list), batch_size):
+		idx += 1
+		to_download = ""
+		for sym in symbols_list[x:x+batch_size]:
+			to_download += sym + " "
+
+		print('{} Symbols have been iterated. Downloading {} additional symbols.'.format(x, len(symbols_list[x:x+batch_size])))
+		try:
+			df_list[idx] = yf.download(to_download, start=start_date, end=end_date)
+		except Exception as e:
+			print(e)
+		print('Done.')
+
+	full_df = pd.concat(df_list, axis=1, sort=False)
+	return full_df
+
 
 class CustomSequence(Sequence):
 	def __init__(self, X_, Y_, batch_size, augment):
