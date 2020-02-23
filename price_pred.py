@@ -20,10 +20,9 @@ import requests
 from bs4 import BeautifulSoup
 symbols_set = set([])
 symbols_text = ""
-for n_page in range(160):
+for n_page in range(5):
 	print('Page {}'.format(n_page))
-	# URL FOR MID-LARGE CAP INT. url = 'https://finance.yahoo.com/screener/unsaved/2d100c4f-9eab-403f-ab91-8de0b917e380?offset={}&count=100'.format(n_page * 100)
-	url = 'https://finance.yahoo.com/screener/unsaved/7e03632f-b9e5-469d-afb7-25d18aa8e444?count=100&offset={}'.format(n_page*100)
+	url = 'https://finance.yahoo.com/screener/unsaved/6298a743-cc2b-48a7-9a15-afedd4797d4c?count=100&offset={}'.format(n_page*100)
 	page = requests.get(url)
 	soup = BeautifulSoup(page.content, 'html.parser')
 
@@ -43,8 +42,8 @@ with open(os.path.join('original_dfs', 'symbols.txt'), 'w') as f:
 
 	# --- Download and Save ---
 symbols_list = list(symbols_set)
-start_date = "2000-01-01"
-end_date = "2019-06-01"
+start_date = "2019-06-02"
+end_date = "2020-02-23"
 batch_size = 100
 df_list = [None] * int(len(symbols_list)/batch_size + 1)
 
@@ -63,9 +62,9 @@ for x in range(0, len(symbols_list), batch_size):
 	print('Done.')
 
 full_df = pd.concat(df_list, axis=1, sort=False)
-full_df.to_hdf(os.path.join('original_dfs', 'to-2019-06-large.h5'), 'df', mode='w', format='fixed')
+full_df.to_hdf(os.path.join('original_dfs', 'from-2019-06-to-2020-02-23-swe.h5'), 'df', mode='w', format='fixed')
 
-df = pd.read_hdf(os.path.join('original_dfs', 'to-2019-06-large.h5'), 'df')
+#df = pd.read_hdf(os.path.join('original_dfs', 'from-2019-06-swe.h5'), 'df')
 #df.to_csv(os.path.join('original_dfs', 'to-2019-06-large.csv'))
 sys.exit(0)
 '''
@@ -96,7 +95,7 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	print('Done.')
 
 
-	max_length = int(len(n_df) / (hist_time_steps + pred_time_steps) * len(symbols) * 1.02)	# Total amount of data periods 
+	max_length = int(len(n_df) / (hist_time_steps + pred_time_steps) * len(symbols) * 1.1)	# Total amount of data periods 
 
 	X_train = np.zeros((max_length, hist_time_steps, 6))
 	X_val = np.zeros((max_length, hist_time_steps, 6))
@@ -106,17 +105,18 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	Y_val = np.zeros((max_length, pred_time_steps))
 	Y_test = np.zeros((max_length, pred_time_steps))
 
-	split_pattern = [0, 1, 0, 2, 0]	# Train: 0, val: 1, test: 2
+	split_pattern = [2]	# Train: 0, val: 1, test: 2
 	
 	n_periods = int((len(n_df) - (hist_time_steps + pred_time_steps)) / (hist_time_steps + pred_time_steps)) + 1
 
-
+	'''
 	split_pattern = [0] * n_periods
 	val_idx = int(n_periods * 0.8)
 	split_pattern[val_idx:] = [1] * (len(split_pattern) - val_idx)
 
 	test_idx = int(n_periods * 0.9)
 	split_pattern[test_idx:] = [2] * (len(split_pattern) - test_idx)
+	'''
 
 	# DEBUG
 	n_x_non_finite = 0
@@ -133,6 +133,7 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	for t in range(len(n_df) - (hist_time_steps + pred_time_steps), 0, -(hist_time_steps + pred_time_steps)): # Iterate through time sections of the full dataset
 		time_period_df = n_df[t:t + (hist_time_steps + pred_time_steps)]	# Get time period from full df (dataframe)
 		period_split = split_pattern[period_idx%(len(split_pattern))]
+		print('Period split: {}'.format(split_pattern[period_idx%(len(split_pattern))]))
 		period_idx+=1
 
 		per_n_x_non_finite = n_x_non_finite
@@ -221,7 +222,7 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	print('Done. Process took {:.2f} minutes and {} data elements were added.'.format((time.time() - start_time) / 60, len(X_train) + len(X_val) + len(X_test)))
 
 
-#create_hdf5(os.path.join('datasets', '90Day-to-2019-06-max_zero_hist_t_steps.h5'), os.path.join('original_dfs', 'to-2019-06-large.h5'), hist_time_steps=90)
+#create_hdf5(os.path.join('datasets', '80Day-FROM-2019-06.h5'), os.path.join('original_dfs', 'from-2019-06-to-2020-02-23-swe.h5'), hist_time_steps=80)
 #df = pd.read_hdf('top10000-part1.h5', 'df')
 #df.to_csv('top10000-part1.csv')
 #sys.exit(0)
@@ -237,14 +238,15 @@ def load_data(filename):
 
 # Available Datasets
 # '90Day-part1-parallel.h5'
+# See datasets folder for more (only in local version)
 # Obsolete datasets (Train, Val, and Test data was overlapping, causing exagurated results too good to be true)
 # 'Top-700-20-year-Swe.h5'
 # 'Top-700-20-year-Swe-120Day.h5'
 # 'Top-100-20-year.h5'
 # '700Swe-20Year-30Day.h5'		
-dataset = os.path.join('datasets', '90Day-to-2019-06-max_zero_hist_t_steps.h5')
+dataset = os.path.join('datasets', '80Day-FROM-2019-06.h5')
 X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data(dataset)
-hist_time_steps = 90
+hist_time_steps = 80
 pred_time_steps = 7
 
 	# --- Model ---
@@ -273,19 +275,20 @@ def scalar_augment(X_elem, Y_elem, min_scalar=1, max_scalar=1):
 
 data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
 
-#model_file_name = os.path.join('checkpoints', 'weights-improvement-18-0.000434.h5')
-#model_std_error = np.array([0.13822494, 0.0556501, 0.06061455, 0.07248468, 0.11877861, 0.08394475, 0.09361661])	# Inaccuracy based on train data
-#model = keras.models.load_model(model_file_name)
+model_file_name = os.path.join('checkpoints', 'to-2019-06-checkpoints', 'weights-improvement-20-0.000289.h5')
+#model_std_error = np.array([0.39474307, 0.36525669, 0.39066132, 0.38776542, 0.3619745, 0.35675924, 0.34576769])	# Inaccuracy based on train data
+model_std_error = np.array([0.60684879, 0.57097587, 0.57766695, 0.50046783, 0.50637192, 0.59326133, 0.52038012]) # Inaccuracy based on val data
+model = keras.models.load_model(model_file_name)
 
-history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
-	validation_data=(X_val, Y_val), epochs=20, callbacks=[reduce_lr, check])
+#history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
+#	validation_data=(X_val, Y_val), epochs=20, callbacks=[reduce_lr, check])
 
 #model.save(os.path.join('models', 'parallel.h5'))
 
-with open(os.path.join('trainHistoryDict', 'to-2019-06_history.txt'), 'wb') as file_pi:
-        pickle.dump(history.history, file_pi)
+#with open(os.path.join('trainHistoryDict', 'to-2019-06_history.txt'), 'wb') as file_pi:
+#        pickle.dump(history.history, file_pi)
 
-sys.exit(0)
+#sys.exit(0)
 
 
 def visualize2(X_, Y_, n_plots=2):
@@ -458,11 +461,14 @@ def evaluate2(X_, Y_, n_):
 	for x in range(n_):
 		disp_count+=1
 		if disp_count % 500 == 0:
-			print('{:.2f} percent evaluated.'.format(x/n_*100))
+			print('{:.1f} percent evaluated.'.format(x/n_*100))
 		i = random.sample(idx_total, 1)[0]
 		idx_total.remove(i)
 
 		previous_close = X_[i][-1][1]
+		if previous_close == 0:
+			print('Previous close is 0!')
+			continue
 		pred = model.predict(np.array([X_[i]]))[0]
 		true = Y_[i]
 
@@ -484,7 +490,7 @@ def evaluate2(X_, Y_, n_):
 		if pred[max_accuracy_day] / previous_close > 1.04:	# "Buy" stock
 			roi_arr[x][2] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
 		
-		if pred[max_accuracy_day] / previous_close > 1.06:	# "Buy" stock
+		if pred[max_accuracy_day] / previous_close > 1.06:	# Performance for this strategy has been good consistently
 			roi_arr[x][3] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
 
 
@@ -504,7 +510,7 @@ def evaluate2(X_, Y_, n_):
 		if np.mean(pred[1:4]) / previous_close > 1.05:
 			roi_arr[x][8] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
 		
-		if np.mean(pred[1:4]) / previous_close > 1.06:
+		if np.mean(pred[1:4]) / previous_close > 1.06:	# This strategy performed best last val trail
 			roi_arr[x][9] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
 
 	mean_roi_arr = np.true_divide(roi_arr.sum(0), (roi_arr!=0).sum(0))
@@ -518,10 +524,10 @@ def evaluate2(X_, Y_, n_):
 
 #visualize2(X_val, Y_val, 5)
 
-#visualize4(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
+#visualize4(X_test, Y_test, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
 
-std_arr, mean_arr, mean_roi_arr, roi_arr = evaluate2(X_train, Y_train, len(X_train)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
+std_arr, mean_arr, mean_roi_arr, roi_arr = evaluate2(X_test, Y_test, len(X_test)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
 									# 49.8% of stock data increased in price
 									# 50.1% of stock data decreased in price
 print(std_arr)
