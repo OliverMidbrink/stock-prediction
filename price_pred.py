@@ -6,7 +6,7 @@ from sklearn import preprocessing
 from sklearn.utils import shuffle
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
-import keras, sys, h5py, random, data_tools, pickle, os, platform, time
+import keras, sys, h5py, random, data_tools, pickle, os, platform, time, data_tools
 from data_tools import trim_zeros
 
 if platform.system() == 'Windows':
@@ -41,27 +41,10 @@ with open(os.path.join('original_dfs', 'symbols.txt'), 'w') as f:
 	f.write(symbols_text)
 
 	# --- Download and Save ---
-symbols_list = list(symbols_set)
 start_date = "2019-06-02"
 end_date = "2020-02-23"
-batch_size = 100
-df_list = [None] * int(len(symbols_list)/batch_size + 1)
 
-idx = -1 
-for x in range(0, len(symbols_list), batch_size):
-	idx += 1
-	to_download = ""
-	for sym in symbols_list[x:x+batch_size]:
-		to_download += sym + " "
-
-	print('{} Symbols have been iterated. Downloading {} additional symbols.'.format(x, len(symbols_list[x:x+batch_size])))
-	try:
-		df_list[idx] = yf.download(to_download, start=start_date, end=end_date)
-	except Exception as e:
-		print(e)
-	print('Done.')
-
-full_df = pd.concat(df_list, axis=1, sort=False)
+full_df = data_tools.download_symbols(list(symbols_set), start_date=start_date, end_date=end_date)
 full_df.to_hdf(os.path.join('original_dfs', 'from-2019-06-to-2020-02-23-swe.h5'), 'df', mode='w', format='fixed')
 
 #df = pd.read_hdf(os.path.join('original_dfs', 'from-2019-06-swe.h5'), 'df')
