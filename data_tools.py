@@ -10,8 +10,6 @@ def scalar_augment(X_, min_scalar=0.5, max_scalar=2):
 	return X_ * scalar
 '''
 def download_symbols(symbols_list, start_date, end_date):
-	start_date = "2019-06-02"
-	end_date = "2020-02-23"
 	batch_size = 100
 	df_list = [None] * int(len(symbols_list)/batch_size + 1)
 
