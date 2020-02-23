@@ -306,8 +306,109 @@ def visualize2(X_, Y_, n_plots=2):
 		plt.axvline(x=29.5)
 		plt.show()
 
-
 def visualize3(X_, Y_, hist_time_steps=30, pred_time_steps=7, start=0):
+	fig1, f1_axes = plt.subplots(ncols=7, nrows=7, sharex='col', tight_layout=True)
+	idx_total = set(range(len(X_)-1))
+
+	for row in range(len(f1_axes)):
+		for col in range(len(f1_axes[0])):
+			if len(idx_total) < 0:
+				print('Data has run out. Total dataset is: {}.'.format(len(X_)))
+
+			index = random.sample(idx_total, 1)[0]
+			idx_total.remove(index)
+
+			pred = model.predict(np.array([X_[index]]))
+			y = np.array([None]*(hist_time_steps + pred_time_steps))		# y values of graph
+
+			for t in range(hist_time_steps + pred_time_steps):	# Add 7 more timesteps to fill graph length (37)
+				if t<hist_time_steps:
+					y[t] = X_[index][t][1]
+				else:
+					y[t] = Y_[index][t-hist_time_steps]
+
+			f1_axes[row][col].plot(range(hist_time_steps + pred_time_steps), y)
+			f1_axes[row][col].plot(range(hist_time_steps + pred_time_steps), np.append([None] * hist_time_steps, pred[0]))
+			f1_axes[row][col].axvline(x=(hist_time_steps-0.5))
+
+
+	plt.show()
+
+
+def evaluate(X_, Y_, n_):
+	idx_total = set(range(len(X_)-1))
+
+	tp=0
+	tn=0
+	fp=0
+	fn=0
+
+	n_buy_correct = 0
+	n_buy_predictions = 0
+	n_buy_incorrect = 0
+	accum_change_of_correct_buy = 0	# Divide by number 
+	accum_change_of_incorrect_buy = 0 # Divide by number of elements
+	accum_purchase = 0 # Accum, previous close
+	accum_stock_trans_cost = 0 # Total transaction costs
+	accum_dev_mean = 0	# Mean of true value (label) accumulated, 7 days in some cases
+	mean_all_stock_ROI = 0 # How did the "market" change during this period
+
+	disp_count=0
+	for x in range(n_):
+		disp_count+=1
+		if disp_count % 1000 == 0:
+			print('{:.3f} percent evaluated.'.format(x/n_*100))
+		i = random.sample(idx_total, 1)[0]
+		idx_total.remove(i)
+
+		previous_close = X_[i][-1][1]
+		pred = model.predict(np.array([X_[i]]))[0]
+		true = Y_[i]
+
+		avg_value_pred = 0	# How will the true and pred stock prices differ from the last close price in X
+		avg_value_true = 0
+		for j in range(len(pred)):
+			avg_value_true+=true[j]/len(true)
+			avg_value_pred+=pred[j]/len(pred)
+
+		if avg_value_pred - previous_close >= 0:
+			if avg_value_true - previous_close >= 0:
+				tp+=1
+			elif avg_value_true - previous_close < 0:
+				fp+=1
+		else:
+			if avg_value_true - previous_close >= 0:
+				fn+=1
+			elif avg_value_true - previous_close < 0:
+				tn+=1
+
+		mean_all_stock_ROI += (avg_value_true - previous_close) / previous_close / n_
+		
+		if pred[np.argmax(pred)] / previous_close > 1.07:	# Decides to purchase stock
+			n_buy_predictions += 1
+			accum_purchase += previous_close	# Buy stock at opening the next day, which would be similar to close at prediction day.
+			accum_stock_trans_cost += previous_close * 0.01	# Counting on 1% transaction fee
+			sell_price = true[-1] # Sell at last random day
+			accum_dev_mean += sell_price
+
+			if sell_price / previous_close > 1.01:	# Stock actually went up 1%, therfore it could be considered a success
+				n_buy_correct += 1
+				accum_change_of_correct_buy += sell_price/previous_close
+			else:	# All bought stocks that did not go up 1%
+				n_buy_incorrect += 1
+				accum_change_of_incorrect_buy += sell_price/previous_close
+
+
+	buy_accuracy = n_buy_correct/n_buy_predictions
+	mean_change_correct_buy = accum_change_of_correct_buy / n_buy_correct
+	mean_change_incorrect_buy = accum_change_of_incorrect_buy / n_buy_incorrect
+
+	ROI = (accum_dev_mean - accum_purchase - accum_stock_trans_cost) / (accum_purchase + accum_stock_trans_cost)
+	msg = 'Market change: {}. Buy Accuracy {}. n_buy {}, n_buy_correct {}, Mean_change_of_stocks_up_1% {}, Mean_not_up_1% {}.\nROI: {}. Result true mean of (pred_days): {}, purchase: {}, trans_cost {}.'.format(mean_all_stock_ROI, buy_accuracy, n_buy_predictions, n_buy_correct, mean_change_correct_buy, mean_change_incorrect_buy, ROI, accum_dev_mean, accum_purchase, accum_stock_trans_cost)
+	return (tp, tn, fp, fn), msg
+
+
+def visualize4(X_, Y_, hist_time_steps=30, pred_time_steps=7, start=0):
 	fig1, f1_axes = plt.subplots(ncols=7, nrows=7, sharex='col', tight_layout=True)
 	idx_total = set(range(len(X_)-1))
 
@@ -409,7 +510,7 @@ def evaluate2(X_, Y_, n_):
 
 #visualize2(X_val, Y_val, 5)
 
-#visualize3(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
+#visualize4(X_val, Y_val, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
 
 std_arr, mean_arr, mean_roi_arr, roi_arr = evaluate2(X_val, Y_val, 2000)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
