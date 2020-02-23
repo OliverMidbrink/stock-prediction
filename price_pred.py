@@ -383,18 +383,19 @@ def evaluate(X_, Y_, n_):
 
 		mean_all_stock_ROI += (avg_value_true - previous_close) / previous_close / n_
 		
-		if pred[np.argmax(pred)] / previous_close > 1.03:	# Decides to purchase stock
+		if pred[np.argmax(pred)] / previous_close > 1.07:	# Decides to purchase stock
 			n_buy_predictions += 1
 			accum_purchase += previous_close	# Buy stock at opening the next day, which would be similar to close at prediction day.
 			accum_stock_trans_cost += previous_close * 0.01	# Counting on 1% transaction fee
-			accum_dev_mean += true[np.argmax(pred)]	# Sell at highest predicted day, therefore development is the pred_high day - previous close
-			# Could sell 
-			if avg_value_true / previous_close > 1.01:	# Stock actually went up 1%, therfore it could be considered a success
+			sell_price = true[-1] # Sell at last random day
+			accum_dev_mean += sell_price
+
+			if sell_price / previous_close > 1.01:	# Stock actually went up 1%, therfore it could be considered a success
 				n_buy_correct += 1
-				accum_change_of_correct_buy += avg_value_true/previous_close
+				accum_change_of_correct_buy += sell_price/previous_close
 			else:	# All bought stocks that did not go up 1%
 				n_buy_incorrect += 1
-				accum_change_of_incorrect_buy += avg_value_true/previous_close
+				accum_change_of_incorrect_buy += sell_price/previous_close
 
 
 	buy_accuracy = n_buy_correct/n_buy_predictions
@@ -413,7 +414,7 @@ def evaluate(X_, Y_, n_):
 #visualize3(X_test, Y_test, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
 
-(tp, tn, fp, fn), msg = evaluate(X_test, Y_test, len(X_test)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
+(tp, tn, fp, fn), msg = evaluate(X_val, Y_val, len(X_val)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
 									# 49.8% of stock data increased in price
 									# 50.1% of stock data decreased in price
 
@@ -428,7 +429,7 @@ print('Taking the mean of prediction values and comparing that to the mean of th
 
 
 # //TODO 
-# 1.  Change buy and sell method, try selling at the highest predicted day, buying if that day is higher than threshold.
+# 1.  Add method to try out and visualize different buy/sell strategies
 	# Maybe make a probability distribution similar to the pred array. 
 	# Make an array of all the change and explore that. For instance the
 	# standard deviation of each pred_time_step. This is useful to show the 
