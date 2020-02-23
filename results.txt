@@ -69,3 +69,9 @@ Market change: 0.06165314726834821. Buy Accuracy 0.4522706209453197. n_buy 1079,
 ROI: 0.022907436950134804. Result true mean of (pred_days): 64.79619995598749, purchase: 62.71794602750281, trans_cost 0.6271794602750297.
 Taking the mean of prediction values and comparing that to the mean of the label values. 
  Accuracy, (TP + TN)/(TP + TN + FP + FN), for dataset datasets/90Day-part1-parallel.h5 was: 0.5178737614277111, Percent of stocks that went up: 0.4804839327749494, percent of stocks that went down 0.5195160672250506. TP: 4302, TN: 5158, FP:4332, FN: 4475.
+
+14) 10000 val samples from to-2019-06-large.h5 dataset gave the following results. (STD per day, mean error per day, ROI)
+[0.60684879 0.57097587 0.57766695 0.50046783 0.50637192 0.59326133 0.52038012]
+[0.0628009  0.04298899 0.0420687  0.0420389  0.04547383 0.07075536 0.06196845]
+Mean ROI array: [0.01917834 0.04334303 0.04731071 0.05571689 0.06225933 0.06671153
+ 0.0732324  0.06225183 0.07115138 0.08384649]
