@@ -50,6 +50,10 @@ def trim_zeros(X_, Y_):
 			Y_out = Y_[:idx+1]
 			searching = False
 
+		if idx == 0:
+			print('Dataset seems to only contain zeros')
+			searching = False
+
 	return X_out, Y_out
 
 
