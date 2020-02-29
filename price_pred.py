@@ -20,9 +20,9 @@ import requests
 from bs4 import BeautifulSoup
 symbols_set = set([])
 symbols_text = ""
-for n_page in range(5):
+for n_page in range(3):
 	print('Page {}'.format(n_page))
-	url = 'https://finance.yahoo.com/screener/unsaved/6298a743-cc2b-48a7-9a15-afedd4797d4c?count=100&offset={}'.format(n_page*100)
+	url = 'https://finance.yahoo.com/screener/unsaved/b643ee85-beab-4e9f-acf7-6c55c6f168ae?count=100&offset={}'.format(n_page*100)
 	page = requests.get(url)
 	soup = BeautifulSoup(page.content, 'html.parser')
 
@@ -42,10 +42,10 @@ with open(os.path.join('original_dfs', 'symbols.txt'), 'w') as f:
 
 	# --- Download and Save ---
 start_date = "2019-06-02"
-end_date = "2020-02-23"
+end_date = "2020-02-25"
 
 full_df = data_tools.download_symbols(list(symbols_set), start_date=start_date, end_date=end_date)
-full_df.to_hdf(os.path.join('original_dfs', 'from-2019-06-to-2020-02-23-swe.h5'), 'df', mode='w', format='fixed')
+full_df.to_hdf(os.path.join('original_dfs', 'from-2019-06-to-2020-02-25-swe290ByVOLUME.h5'), 'df', mode='w', format='fixed')
 
 #df = pd.read_hdf(os.path.join('original_dfs', 'from-2019-06-swe.h5'), 'df')
 #df.to_csv(os.path.join('original_dfs', 'to-2019-06-large.csv'))
@@ -116,7 +116,7 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	for t in range(len(n_df) - (hist_time_steps + pred_time_steps), 0, -(hist_time_steps + pred_time_steps)): # Iterate through time sections of the full dataset
 		time_period_df = n_df[t:t + (hist_time_steps + pred_time_steps)]	# Get time period from full df (dataframe)
 		period_split = split_pattern[period_idx%(len(split_pattern))]
-		print('Period split: {}'.format(split_pattern[period_idx%(len(split_pattern))]))
+		print('Period split: {}'.format(split_pattern[period_idx%len(split_pattern)]))
 		period_idx+=1
 
 		per_n_x_non_finite = n_x_non_finite
@@ -205,7 +205,7 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	print('Done. Process took {:.2f} minutes and {} data elements were added.'.format((time.time() - start_time) / 60, len(X_train) + len(X_val) + len(X_test)))
 
 
-#create_hdf5(os.path.join('datasets', '80Day-FROM-2019-06.h5'), os.path.join('original_dfs', 'from-2019-06-to-2020-02-23-swe.h5'), hist_time_steps=80)
+#create_hdf5(os.path.join('datasets', '80Day-250Stocks-FROM-2019-06.h5'), os.path.join('original_dfs', 'from-2019-06-to-2020-02-25-swe290ByVOLUME.h5'), hist_time_steps=80)
 #df = pd.read_hdf('top10000-part1.h5', 'df')
 #df.to_csv('top10000-part1.csv')
 #sys.exit(0)
@@ -227,7 +227,7 @@ def load_data(filename):
 # 'Top-700-20-year-Swe-120Day.h5'
 # 'Top-100-20-year.h5'
 # '700Swe-20Year-30Day.h5'		
-dataset = os.path.join('datasets', '80Day-FROM-2019-06.h5')
+dataset = os.path.join('datasets', '80Day-250Stocks-FROM-2019-06.h5')
 X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data(dataset)
 hist_time_steps = 80
 pred_time_steps = 7
@@ -438,7 +438,8 @@ def evaluate2(X_, Y_, n_):
 	mean_all_stock_ROI = 0 # How did the "market" change during this period
 
 	error_arr = np.zeros((n_, len(Y_[0])))
-	roi_arr = np.zeros((n_, 1 + 9))	# Columns: ROI buy and sell last day (all stocks), ROI strategy 1, ROI strategy 2 ...
+	roi_arr = np.zeros((n_, 1 + 5))	# Columns: ROI buy and sell last day (all stocks), ROI strategy 1, ROI strategy 2 ...
+	change_arr = np.zeros((n_, 1 + 5))
 
 	disp_count=0
 	for x in range(n_):
@@ -461,46 +462,50 @@ def evaluate2(X_, Y_, n_):
 			mean_value_true+=true[j]/len(true)
 			mean_value_pred+=pred[j]/len(pred)
 
-			error_arr[x][j] = (pred[j] - true[j]) / previous_close	# Error in relation to previous close
+			error_arr[x][j] = (pred[j] - true[j]) / true[j]	# Error in relation to previous close
 
 		roi_arr[x][0] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)	# How did the stock change over the pred period (taking trans fee into account)
+		change_arr[x][0] = (true[-1] - previous_close) / previous_close
+
+		if (true[-1] - previous_close) / previous_close > 0.3 or (true[-1] - previous_close) / previous_close < -0.3:
+			print('Strong change: {}, pred: {}.'.format((true[-1] - previous_close) / previous_close, (pred[-1] - previous_close) / previous_close))
+		else:
+			# Change less than 30 percent up/down
+			roi_arr[x][4] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
+			change_arr[x][4] = (true[-1] - previous_close) / previous_close
+
+			if pred[4] / previous_close > 1.02:	# Performance for this strategy has been good consistently
+				roi_arr[x][5] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
+				change_arr[x][5] = (true[-1] - previous_close) / previous_close
 
 		# --- PURCHASING STRATEGIES ---
 		max_accuracy_day = np.argmin(model_std_error)
-		if pred[max_accuracy_day] / previous_close > 1.03:	# "Buy" stock
+		
+		if pred[4] / previous_close > 1.02:	# Performance for this strategy has been good consistently
 			roi_arr[x][1] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
-		
-		if pred[max_accuracy_day] / previous_close > 1.04:	# "Buy" stock
+			change_arr[x][1] = (true[-1] - previous_close) / previous_close
+
+		if np.mean(pred[1:-2]) / previous_close > 1.06:	# This strategy performed best last val trail
 			roi_arr[x][2] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
-		
-		if pred[max_accuracy_day] / previous_close > 1.06:	# Performance for this strategy has been good consistently
+			change_arr[x][2] = (true[-1] - previous_close) / previous_close
+
+		if pred[4] / previous_close > 1.04:	# This strategy performed best last val trail
 			roi_arr[x][3] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
+			change_arr[x][3] = (true[-1] - previous_close) / previous_close
 
-
-		if pred[max_accuracy_day] / previous_close > 1.07:	# Sell at last day
-			roi_arr[x][4] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
-		
-		if pred[max_accuracy_day] / previous_close > 1.08:
-			roi_arr[x][5] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
-		
-		if pred[max_accuracy_day] / previous_close > 1.09:
-			roi_arr[x][6] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
-
-
-		if np.mean(pred[1:4]) / previous_close > 1.04:	# Sell at last day
-			roi_arr[x][7] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
-		
-		if np.mean(pred[1:4]) / previous_close > 1.05:
-			roi_arr[x][8] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
-		
-		if np.mean(pred[1:4]) / previous_close > 1.06:	# This strategy performed best last val trail
-			roi_arr[x][9] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)
 
 	mean_roi_arr = np.true_divide(roi_arr.sum(0), (roi_arr!=0).sum(0))
+	mean_change_arr = np.true_divide(change_arr.sum(0), (change_arr!=0).sum(0))
+	print(change_arr)
+	print('  Up   ', np.true_divide((change_arr>0).sum(0), (change_arr!=0).sum(0)))
+	print('  Down ', np.true_divide((change_arr<0).sum(0), (change_arr!=0).sum(0)))
+	print('Number ', (change_arr!=0).sum(0))
+	print('Change ', mean_change_arr)
+	print('   ROI ', mean_roi_arr)
 
 	std_error_arr = np.std(error_arr, axis=0)
 	mean_error_arr = np.mean(error_arr, axis=0)
-	return std_error_arr, mean_error_arr, mean_roi_arr, roi_arr
+	return std_error_arr, mean_error_arr, mean_roi_arr, roi_arr, mean_change_arr
 
 
 
@@ -510,19 +515,25 @@ def evaluate2(X_, Y_, n_):
 #visualize4(X_test, Y_test, hist_time_steps=hist_time_steps, pred_time_steps=pred_time_steps)
 
 
-std_arr, mean_arr, mean_roi_arr, roi_arr = evaluate2(X_test, Y_test, len(X_test)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
+std_arr, mean_arr, mean_roi_arr, roi_arr, mean_change_arr = evaluate2(X_test, Y_test, len(X_test)-1)	# 53.4% Accuracy (TP + TN)/(TP + TN + FP + FN)
 									# 49.8% of stock data increased in price
 									# 50.1% of stock data decreased in price
+
+'''
 print(std_arr)
 print(mean_arr)
 print('Mean ROI array: {}'.format(mean_roi_arr))
+print('Sum change array: {}'.format(mean_change_arr))
 n_per_method = (roi_arr!=0).sum(0)
 n_per_method[0] = 0
+'''
 
+'''
 fig, ax = plt.subplots(figsize=(6,4))
 ax.plot(std_arr)
 ax.plot(mean_arr)
 ax.plot(mean_roi_arr)
+ax.plot(mean_change_arr)
 ax2 = ax.twinx()
 ax2.plot(n_per_method, color='tab:purple')
 ax.set_xlabel('Prediction day index and Method index')
@@ -530,7 +541,7 @@ ax.set_ylabel('STD (Blue), Mean Error (Orange) and Mean ROI per Method (Green)',
 ax2.set_ylabel('Number of purchases for each method', color='tab:purple')
 ax2.tick_params(axis='y', labelcolor='tab:purple')
 plt.show()
-
+'''
 
 # //TODO 
 # 1.  Try creating a rolling train dataset.
