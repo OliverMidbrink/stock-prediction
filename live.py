@@ -22,12 +22,23 @@ latest_df_file_name = os.path.join('original_dfs', 'latest', 'latest-{}-steps{}.
 
 	# --- Download/load data ---
 latest_df = None
-if not os.path.isfile(latest_df_file_name):
+should_replace = False
+if datetime.now().timetuple()[6] < 5 and os.path.isfile(latest_df_file_name):	# Weekday so market is likely open, check if file needs to be refreshed
+	file_date = datetime.fromtimestamp(os.path.getmtime(latest_df_file_name))
+	market_close_today = datetime.now().replace(hour=17, minute=30, second=0)
+
+	if (market_close_today - file_date).total_seconds() > 0: # File should be replaced
+		should_replace = True
+		print('Market should be open today and {} will be refreshed'.format(latest_df_file_name))
+
+
+if not os.path.isfile(latest_df_file_name) or should_replace:
+	print('Creating dataset {}.'.format(latest_df_file_name))
 	swe_symbols = ""
 	with open(os.path.join('original_dfs', 'swe_500_symbols.txt'), 'r') as f:
 		swe_symbols = f.read()
 
-	latest_df = data_tools.download_symbols(swe_symbols.split(), start_date=start_date, end_date=today)
+	latest_df = data_tools.download_symbols(swe_symbols.split(), start_date=start_date, end_date=(today + timedelta(days=1)))
 	latest_df.to_hdf(latest_df_file_name, 'df', mode='w', format='fixed')	#save file
 
 else:
@@ -50,7 +61,7 @@ for sym in symbols:	#iterate through stocks and normalize data for that stock
 print('Done.')
 
 latest_n_df = n_df[-hist_time_steps:]	# Hist time steps long data of 500 swedish stocks
-
+print('Latest row: {}'.format(latest_n_df[-1:]))
 
 # --- Find good stocks to buy ---
 def disp_pred(prev_price, pred, title, show_now=True):
@@ -110,9 +121,11 @@ for sym in symbols:
 
 print('Scanned {} stocks. {} of them were recommended.'.format(n_sym, n_rec))
 
-for sym in stocks_to_buy:
-	disp_stock(sym)
+if input('Preview stocks: ') == 'y':
+	for sym in stocks_to_buy:
+		disp_stock(sym)
+
 
 recommendations = " ".join(stocks_to_buy)
-with open(os.path.join('recommendations', '{}-{}step-recommendations.txt'.format(today, hist_time_steps)), 'w') as f:
+with open(os.path.join('recommendations', '{}-{}-{}step-recommendations.txt'.format(today, datetime.time(datetime.now()), hist_time_steps)), 'w') as f:
 	f.write(recommendations)
