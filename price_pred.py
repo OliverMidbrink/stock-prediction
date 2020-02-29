@@ -467,7 +467,7 @@ def evaluate2(X_, Y_, n_):
 		roi_arr[x][0] = (true[-1] - previous_close * 1.01) / (previous_close * 1.01)	# How did the stock change over the pred period (taking trans fee into account)
 		change_arr[x][0] = (true[-1] - previous_close) / previous_close
 
-		if (true[-1] - previous_close) / previous_close > 0.3 or (true[-1] - previous_close) / previous_close < -0.3:
+		if (true[-1] - previous_close) / previous_close > 0.3 or (true[-1] - previous_close) / previous_close < -0.3:	# Showing only stocks with less than 30% change
 			print('Strong change: {}, pred: {}.'.format((true[-1] - previous_close) / previous_close, (pred[-1] - previous_close) / previous_close))
 		else:
 			# Change less than 30 percent up/down
