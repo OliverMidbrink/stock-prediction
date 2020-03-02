@@ -27,7 +27,7 @@ if datetime.now().timetuple()[6] < 5 and os.path.isfile(latest_df_file_name):	# 
 	file_date = datetime.fromtimestamp(os.path.getmtime(latest_df_file_name))
 	market_close_today = datetime.now().replace(hour=17, minute=30, second=0)
 
-	if (market_close_today - file_date).total_seconds() > 0: # File should be replaced
+	if (market_close_today - file_date).total_seconds() > 0 and (market_close_today - datetime.now()).total_seconds() < 0: # If file was created before market close and time now is after
 		should_replace = True
 		print('Market should be open today and {} will be refreshed'.format(latest_df_file_name))
 
