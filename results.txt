@@ -1,5 +1,9 @@
 The Following are the results for samples on the validation data:
 
+17) Pilot vecka 9 - urvalet efter 7 börsdagar: -3.92% (Innan stängning)
+	Genomsnittet av aktier som urvalet gjordes utifrån: -4.08% (Innan stängning 7:e dagen)
+
+
 16) swe-from-2019-06-to-2020-02-23. 
 [0.9301005  1.11421914 0.98978458 1.07569793 1.19199186 1.20412518 1.26468513]
 [ 0.23232486  0.16611239  0.12090727  0.08826334  0.03132306 -0.01149855 0.00737301]

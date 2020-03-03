@@ -168,7 +168,7 @@ def create_multilength_hdf5(output_filename, raw_dataset, hist_time_steps=30, pr
 	test_next_idx = 0
 
 	period_idx = 0
-	for t in range(len(n_df) - (hist_time_steps + pred_time_steps), 0, -(hist_time_steps + pred_time_steps)): # Iterate through time sections of the full dataset
+	for t in range(len(n_df), 0, -1): # Iterate
 		time_period_df = n_df[t:t + (hist_time_steps + pred_time_steps)]	# Get time period from full df (dataframe)
 		period_split = split_pattern[period_idx%(len(split_pattern))]
 		print('Period split: {}'.format(split_pattern[period_idx%len(split_pattern)]))
