@@ -1,8 +1,10 @@
 from tensorflow.python.keras.utils.data_utils import Sequence
 import numpy as np
 import random
+import os, time, sys
 import pandas as pd
 import yfinance as yf
+import matplotlib.pyplot as plt
 
 '''
 def scalar_augment(X_, min_scalar=0.5, max_scalar=2):
@@ -100,7 +102,7 @@ print('Y avg max: {}.'.format(explore_df['Sum Y'].max()))
 '''
 
 # model should predict: 
-	# 1 market days - might be better to create a new day_trading model instead of interday model
+	# (1 market days) - might be better to create a new day_trading model instead of interday model
 	# 3 market days - half a week
 	# 5 market days - a week
 	# 10 market days - around two weeks
@@ -109,8 +111,8 @@ print('Y avg max: {}.'.format(explore_df['Sum Y'].max()))
 	# 260 market days - around a year
 
 
-def create_multilength_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_steps=7): #Create multi-length training dataset
-	start_time = time.time()
+def create_sliding_hdf5(output_filename, raw_dataset, hist_time_steps=500, stride=20, pred_time_steps=[1, 3, 5, 10, 20, 65]): #Create a sliding training dataset. Latest time period will be added to the validation set.  
+	start_time = time.time()																								  #network therefore starts training at t_now - longest_pred_time_step - stride (could be 85 market days after specified time if 65 pred and 20 stride).
 
 	print('Reading data file...')
 	df = pd.read_hdf(raw_dataset, 'df')
@@ -121,31 +123,41 @@ def create_multilength_hdf5(output_filename, raw_dataset, hist_time_steps=30, pr
 	variables = df.columns.get_level_values(1).unique()
 	symbols = df.columns.get_level_values(0).unique()
 
-	# Normalize
-	print('Normalizing data...')
-	n_df = df.copy()
-	n_df = n_df.fillna(method='ffill')
-	n_df = n_df.fillna(0)
-	for sym in symbols:	#iterate through stocks and normalize data for that stock
-		v_df = n_df[sym]
-		nv_df=(v_df-v_df.min())/(v_df.max()-v_df.min())
-		n_df[sym] = nv_df
-	print('Done.')
+	# Get Normalized Data
+	n_file = raw_dataset[:-3] + '-NormalizedAndLevelChange.h5'
+	n_df = None
+
+	if not os.path.isfile(n_file):
+		print('Normalizing data...')
+		n_df = df.copy()
+		n_df = n_df.fillna(method='ffill')
+		n_df = n_df.fillna(0)
+		for sym in symbols:	#iterate through stocks and normalize data for that stock
+			v_df = n_df[sym]
+			nv_df=(v_df-v_df.min())/(v_df.max()-v_df.min())
+			n_df[sym] = nv_df
+
+		n_df.to_hdf(n_file, 'df', mode='w', format='fixed')
+		print('Normalized data file saved.')
+	else:
+		print('Loading normalized data, since it already exists.')
+		n_df = pd.read_hdf(n_file, 'df')
+		print('Done.')
 
 
-	max_length = int(len(n_df) / (hist_time_steps + pred_time_steps) * len(symbols) * 1.1)	# Total amount of data periods 
+	max_length = int(len(n_df) / (stride) * len(symbols) * 1.1)	# Total amount of data periods 
 
 	X_train = np.zeros((max_length, hist_time_steps, 6))
 	X_val = np.zeros((max_length, hist_time_steps, 6))
 	X_test = np.zeros((max_length, hist_time_steps, 6))
 
-	Y_train = np.zeros((max_length, pred_time_steps))	
-	Y_val = np.zeros((max_length, pred_time_steps))
-	Y_test = np.zeros((max_length, pred_time_steps))
+	Y_train = np.zeros((max_length, len(pred_time_steps)))	
+	Y_val = np.zeros((max_length, len(pred_time_steps)))
+	Y_test = np.zeros((max_length, len(pred_time_steps)))
 
-	split_pattern = [2]	# Train: 0, val: 1, test: 2
+	split_pattern = [0]	# Train: 0, val: 1, test: 2
 	
-	n_periods = int((len(n_df) - (hist_time_steps + pred_time_steps)) / (hist_time_steps + pred_time_steps)) + 1
+	n_periods = int(	(len(n_df) - hist_time_steps - np.amax(pred_time_steps) - 1) / stride	) + 1
 
 	'''
 	split_pattern = [0] * n_periods
@@ -162,16 +174,20 @@ def create_multilength_hdf5(output_filename, raw_dataset, hist_time_steps=30, pr
 	n_x_contain_zero = 0 
 	n_y_contain_zero = 0
 	n_elements = 0
+	n_flat = 0
 
 	train_next_idx = 0
 	val_next_idx = 0
 	test_next_idx = 0
 
 	period_idx = 0
-	for t in range(len(n_df), 0, -1): # Iterate
-		time_period_df = n_df[t:t + (hist_time_steps + pred_time_steps)]	# Get time period from full df (dataframe)
-		period_split = split_pattern[period_idx%(len(split_pattern))]
-		print('Period split: {}'.format(split_pattern[period_idx%len(split_pattern)]))
+	for t in range(len(n_df) - hist_time_steps - np.amax(pred_time_steps) - 1, 0, -stride): # Iterate through time sections of the full dataset
+		time_period_df = n_df[t:t + hist_time_steps + np.amax(pred_time_steps) + 1]	# Get time period from full df (dataframe)
+		period_split = split_pattern[period_idx%len(split_pattern)]
+		
+		if period_idx == 0:	# Always make latest time period validation data
+			period_split = 1
+		
 		period_idx+=1
 
 		per_n_x_non_finite = n_x_non_finite
@@ -179,22 +195,18 @@ def create_multilength_hdf5(output_filename, raw_dataset, hist_time_steps=30, pr
 		per_n_x_contain_zero = n_x_contain_zero
 		per_n_y_contain_zero = n_y_contain_zero
 		per_n_elements = n_elements
+		per_n_flat = n_flat
 
 		for sym in symbols:
 			sym_df = time_period_df[sym]
-			x_p = sym_df[:hist_time_steps].values
-			y_p = sym_df[hist_time_steps:]["Close"].values
-			n_elements+=1
 
-			# Filter data
+			x_p = sym_df[:hist_time_steps].values
+
+
+			# Filter X data
 			if not np.isfinite(x_p).all():	# If not all the values are finite, don't add element
 				#print('X element conains non finite value.')
 				n_x_non_finite+=1
-				continue
-
-			if not np.isfinite(y_p).all():	# If not all the values are finite, don't add element
-				#print('Y element conains non finite value.')
-				n_y_non_finite+=1
 				continue
 
 			if np.count_nonzero(x_p==0) > hist_time_steps:
@@ -202,17 +214,42 @@ def create_multilength_hdf5(output_filename, raw_dataset, hist_time_steps=30, pr
 				n_x_contain_zero+=1
 				continue
 
+			if np.sum(x_p) / (6 * hist_time_steps) < 0.003:	# Get average value for X
+				#print('X mean value is {} (abnormal), removing'.format(np.sum(x_p) / (6 * hist_time_steps)))
+				continue
+
+
+			y_p = np.empty(len(pred_time_steps))
+
+			for pred_idx in range(len(y_p)):	# Get the labels from sym_df
+				y_idx = hist_time_steps + pred_time_steps[pred_idx]		# index for certain label in time_period_df
+				y_p_elem = sym_df[y_idx:y_idx + 1]['Close'].values
+
+				if len(y_p_elem) == 0: 
+					print('Empty label value: {}, y_idx: {}'.format(sym_df[y_idx:y_idx + 1], y_idx))
+				else:
+					y_p[pred_idx] = y_p_elem[0]				
+
+			n_elements+=1
+
+			# Filter Y data
+			if not np.isfinite(y_p).all():	# If not all the values are finite, don't add element
+				#print('Y element conains non finite value.')
+				n_y_non_finite+=1
+				continue
+
 			if np.count_nonzero(y_p==0) > 0:
 				#print('Y element contained zeros')
 				n_y_contain_zero+=1
 				continue
 
-			if np.sum(x_p) / (6 * hist_time_steps + 6 * pred_time_steps) < 0.005:	# Get average value for X
-				print('X mean value is abnormal, removing')
+			if np.sum(y_p) / len(pred_time_steps) < 0.003 or np.sum(y_p) / len(pred_time_steps) > 0.99: # Get average value for y
+				#print('Y mean value is {} (abnormal), removing'.format(np.sum(y_p) / len(pred_time_steps)))
 				continue
 
-			if np.sum(y_p) / pred_time_steps < 0.005 or np.sum(y_p) / pred_time_steps > 0.99: # Get average value for y
-				print('Y mean value is abnormal, removing')
+			if np.mean(np.diff(x_p, axis=0)[-3:], axis=0)[1] == 0:
+				#print('Data is flat at the end. Company might have shut down leaving lack of data.')
+				n_flat+=1
 				continue
 
 			if period_split == 0:	# Add to traing set
@@ -230,12 +267,13 @@ def create_multilength_hdf5(output_filename, raw_dataset, hist_time_steps=30, pr
 				Y_test[test_next_idx] = y_p
 				test_next_idx+=1
 
-		print('Running average. Non finite X, Y: {}, {}. Elements that contained too many zeros: {}, {}'.format(
+		print('Running average. Non finite X, Y: {}, {}. Elements that contained too many zeros: {}, {}. Flat {}'.format(
 			(n_x_non_finite - per_n_x_non_finite) / (n_elements - per_n_elements), (n_y_non_finite - per_n_y_non_finite) / (n_elements - per_n_elements), 
-			(n_x_contain_zero - per_n_x_contain_zero) / (n_elements - per_n_elements), (n_y_contain_zero - per_n_y_contain_zero) / (n_elements - per_n_elements)))
-		print('{:0.4f}% of periods completed'.format(period_idx/n_periods * 100))
+			(n_x_contain_zero - per_n_x_contain_zero) / (n_elements - per_n_elements), (n_y_contain_zero - per_n_y_contain_zero) / (n_elements - per_n_elements),
+			(n_flat - per_n_flat) / (n_elements - per_n_elements) ))
+		print('{:0.4f}% of periods completed. \n\nETA {:0.2f} minutes\n'.format(period_idx/n_periods * 100, (time.time()-start_time) / 60 / (period_idx/n_periods)))
 
-	print('Filtered. Non finite X, Y: {}, {}. Elements that contained too many zeros: {}, {}'.format(n_x_non_finite / n_elements, n_y_non_finite / n_elements, n_x_contain_zero / n_elements, n_y_contain_zero / n_elements))
+	print('Filtered. Non finite X, Y: {}, {}. Elements that contained too many zeros: {}, {}. Flat {}'.format(n_x_non_finite / n_elements, n_y_non_finite / n_elements, n_x_contain_zero / n_elements, n_y_contain_zero / n_elements, n_flat / n_elements))
 	
 	X_train, Y_train = trim_zeros(X_train, Y_train)
 	X_val, Y_val = trim_zeros(X_val, Y_val)
@@ -258,5 +296,3 @@ def create_multilength_hdf5(output_filename, raw_dataset, hist_time_steps=30, pr
 	hf.close()
 
 	print('Done. Process took {:.2f} minutes and {} data elements were added.'.format((time.time() - start_time) / 60, len(X_train) + len(X_val) + len(X_test)))
-
-

@@ -205,10 +205,11 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	print('Done. Process took {:.2f} minutes and {} data elements were added.'.format((time.time() - start_time) / 60, len(X_train) + len(X_val) + len(X_test)))
 
 
+data_tools.create_sliding_hdf5(os.path.join('datasets', 'to-2019-06-sliding_dataset.h5'), os.path.join('original_dfs', 'to-2019-06-large.h5'))
 #create_hdf5(os.path.join('datasets', '80Day-250Stocks-FROM-2019-06.h5'), os.path.join('original_dfs', 'from-2019-06-to-2020-02-25-swe290ByVOLUME.h5'), hist_time_steps=80)
 #df = pd.read_hdf('top10000-part1.h5', 'df')
 #df.to_csv('top10000-part1.csv')
-#sys.exit(0)
+sys.exit(0)
 
 def load_data(filename):
 	hf = h5py.File(filename, 'r')
