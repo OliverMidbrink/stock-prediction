@@ -15,14 +15,11 @@ from keras.engine import topology
 	# --- Requirements for data ---		###This file gets the latest X market days and makes predictions for the symbols loaded around line 38 ### 
 hist_time_steps = 500
 
-#model_file_name = os.path.join('checkpoints', 'to-2019-06-checkpoints', 'weights-improvement-20-0.000289.h5') #30 day model. Change above variable hist_time_steps
-model_file_name = os.path.join('checkpoints', 'to-2019-06-sliding-checkpoints', 'weights-improvement-12-0.003575.h5')
+model_file_name = os.path.join('checkpoints', 'to-2019-06-checkpoints', 'weights-improvement-20-0.000289.h5') #30 day model. Change above variable hist_time_steps
+#model_file_name = os.path.join('checkpoints', 'to-2019-06-sliding-checkpoints', 'weights-improvement-12-0.003575.h5')
 model_name = re.sub('\W', '', model_file_name)
 #model_file_name = os.path.join('checkpoints', 'weights-improvement-18-0.000434.h5')
 #model_std_error = np.array([0.60684879, 0.57097587, 0.57766695, 0.50046783, 0.50637192, 0.59326133, 0.52038012]) # Inaccuracy based on val data
-model_loaded = keras.models.load_model(model_file_name)
-model_loaded.save_weights(model_file_name[:-3]+'-weights_only.h5')
-
 pred_time_steps = [1, 3, 5, 10, 20, 65]
 
 cpu_compatible_model = keras.models.Sequential()
@@ -32,11 +29,10 @@ cpu_compatible_model.add(keras.layers.GRU(70, return_sequences=False, reset_afte
 cpu_compatible_model.add(keras.layers.Dense(70))
 cpu_compatible_model.add(keras.layers.Dropout(0.15))
 cpu_compatible_model.add(keras.layers.Dense(len(pred_time_steps)))
-print(cpu_compatible_model.predict(np.zeros((1,500,6))))
+
 cpu_compatible_model.load_weights(os.path.join('checkpoints', 'to-2019-06-sliding-checkpoints', 'weights-improvement-12-0.003575-weights_only.h5'))
-print(cpu_compatible_model.predict(np.zeros((1,500,6))))
-print(cpu_compatible_model.predict(np.zeros((1,500,6))))
-sys.exit(0)
+
+cpu_compatible_model = keras.models.load_model(model_file_name)	# (Comment if not compatible)
 
 today = datetime.date(datetime.now())
 start_date = '2000-01-01'
@@ -137,7 +133,7 @@ for x in range(n_symbols):
 	input_data[x] = latest_n_df[symbols[x]].values
 
 
-predictions = model.predict(input_data)
+predictions = cpu_compatible_model.predict(input_data)
 
 # Normalize prediction (to percent change from previous close)
 for sym_i in range(len(predictions)):
