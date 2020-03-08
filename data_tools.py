@@ -60,7 +60,32 @@ class CustomSequence(Sequence):
 					batch_x = []
 					batch_y = []						
 						
+class RandomSequence(Sequence):
+	def __init__(self, X_, Y_, batch_size, augment):
+		self.X, self.Y = X_, Y_
+		self.batch_size = batch_size
+		self.augment = augment
 
+	def __len__(self):
+		return int(np.ceil(len(self.X) / float(self.batch_size)))
+
+	def __getitem__(self, idx):
+		while True:
+			batch_x = []
+			batch_y = []
+
+			random_indices = list(range(len(self.X)))
+			random.shuffle(random_indices)
+			
+			for i in random_indices:
+				X_, Y_ = self.augment(self.X[i], self.Y[i])				
+				batch_x.append(X_)	# Append augmented X
+				batch_y.append(Y_)
+					
+				if len(batch_x) == self.batch_size:
+					yield np.array(batch_x), np.array(batch_y)
+					batch_x = []
+					batch_y = []
 
 
 def trim_zeros(X_, Y_):
