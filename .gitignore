@@ -1,6 +1,5 @@
 original_dfs/
 datasets/
-checkpoints/
 .DS_Store
 __pycache__/
 recommendations/
