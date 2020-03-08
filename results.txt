@@ -1,5 +1,8 @@
 The Following are the results for samples on the validation data:
 
+18) pilot03-02-kl0901 (urvalet) presterade från 02-03 till slutet av fre 6 mars: -0.7%
+	# börsen presterade -1.28%
+
 17) Pilot vecka 9 - urvalet efter 7 börsdagar: -3.92% (Innan stängning)
 	Genomsnittet av aktier som urvalet gjordes utifrån: -4.08% (Innan stängning 7:e dagen)
 
