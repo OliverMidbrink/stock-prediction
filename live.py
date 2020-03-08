@@ -6,13 +6,38 @@ from sklearn import preprocessing
 from sklearn.utils import shuffle
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
-import keras, sys, h5py, random, data_tools, pickle, os, platform, time, data_tools
+import keras, sys, h5py, random, data_tools, pickle, os, platform, time, data_tools, re
 from datetime import datetime, timedelta
 from data_tools import trim_zeros
+from keras.engine import topology
 
 
 	# --- Requirements for data ---		###This file gets the latest X market days and makes predictions for the symbols loaded around line 38 ### 
-hist_time_steps = 90
+hist_time_steps = 500
+
+#model_file_name = os.path.join('checkpoints', 'to-2019-06-checkpoints', 'weights-improvement-20-0.000289.h5') #30 day model. Change above variable hist_time_steps
+model_file_name = os.path.join('checkpoints', 'to-2019-06-sliding-checkpoints', 'weights-improvement-12-0.003575.h5')
+model_name = re.sub('\W', '', model_file_name)
+#model_file_name = os.path.join('checkpoints', 'weights-improvement-18-0.000434.h5')
+#model_std_error = np.array([0.60684879, 0.57097587, 0.57766695, 0.50046783, 0.50637192, 0.59326133, 0.52038012]) # Inaccuracy based on val data
+model_loaded = keras.models.load_model(model_file_name)
+model_loaded.save_weights(model_file_name[:-3]+'-weights_only.h5')
+
+pred_time_steps = [1, 3, 5, 10, 20, 65]
+
+cpu_compatible_model = keras.models.Sequential()
+cpu_compatible_model.add(keras.layers.GRU(120, return_sequences=True, input_shape=(None,6), reset_after = True, recurrent_activation='sigmoid'))	# None for any number of timesteps
+cpu_compatible_model.add(keras.layers.GRU(120, return_sequences=True, reset_after = True, recurrent_activation='sigmoid'))	# None for any number of timesteps
+cpu_compatible_model.add(keras.layers.GRU(70, return_sequences=False, reset_after = True, recurrent_activation='sigmoid'))
+cpu_compatible_model.add(keras.layers.Dense(70))
+cpu_compatible_model.add(keras.layers.Dropout(0.15))
+cpu_compatible_model.add(keras.layers.Dense(len(pred_time_steps)))
+print(cpu_compatible_model.predict(np.zeros((1,500,6))))
+cpu_compatible_model.load_weights(os.path.join('checkpoints', 'to-2019-06-sliding-checkpoints', 'weights-improvement-12-0.003575-weights_only.h5'))
+print(cpu_compatible_model.predict(np.zeros((1,500,6))))
+print(cpu_compatible_model.predict(np.zeros((1,500,6))))
+sys.exit(0)
+
 
 today = datetime.date(datetime.now())
 start_date = '2000-01-01'
@@ -104,12 +129,6 @@ def disp_stock(sym):
 
 
 
-model_file_name = os.path.join('checkpoints', 'to-2019-06-checkpoints', 'weights-improvement-20-0.000289.h5')
-#model_file_name = os.path.join('checkpoints', 'weights-improvement-18-0.000434.h5')
-model_std_error = np.array([0.60684879, 0.57097587, 0.57766695, 0.50046783, 0.50637192, 0.59326133, 0.52038012]) # Inaccuracy based on val data
-model = keras.models.load_model(model_file_name)
-
-
 # Save as spreadsheet
 n_symbols = len(symbols)
 
@@ -138,7 +157,7 @@ for sym_i in range(len(symbols)):
 	pred_df_rename_dict[sym_i] = symbols[sym_i]
 pred_df.rename(index=pred_df_rename_dict, inplace=True)
 
-pred_df.to_csv(os.path.join('recommendations', 'date{}-time{}-step{}-recommendations.csv'.format(today, datetime.time(datetime.now()), hist_time_steps)))
+pred_df.to_csv(os.path.join('recommendations', 'date{}-time{}-step{}-model-{}.csv'.format(today, datetime.time(datetime.now()), hist_time_steps, model_name)))
 
 
 # Purchase strategy that seems to work
@@ -152,11 +171,10 @@ for sym in symbols:
 		print('Number {} out of {}. {:.1f}% complete'.format(n_sym, len(symbols), n_sym/len(symbols)*100))
 	X = input_data[n_sym-1]
 	
-	pred = predictions[n_sym-1]
+	pred = predictions[n_sym-1]	# (-1 because idx start is 1)
 	previous_close = X[-1][1]
 
-	max_accuracy_day = np.argmin(model_std_error)
-	if pred[max_accuracy_day] / previous_close > 1.07 and np.mean(pred[1:4]) / previous_close > 1.06:	# Buy conditions
+	if pred[3] / previous_close > 1.07 and np.mean(pred[1:3]) / previous_close > 1.05:	# "Buy" conditions
 		stocks_to_buy.append(sym)
 		n_rec+=1
 		#disp_pred(latest_n_df[sym]['Close'].values, pred, 'Close price for {}'.format(sym))
@@ -169,7 +187,7 @@ if input('Preview stocks: ') == 'y':
 
 
 recommendations = " ".join(stocks_to_buy)
-rec_txt_name = os.path.join('recommendations', 'date{}-time{}-step{}-recommendations.txt'.format(today, datetime.time(datetime.now()), hist_time_steps))
+rec_txt_name = os.path.join('recommendations', 'date{}-time{}-step{}-model-{}.txt'.format(today, datetime.time(datetime.now()), hist_time_steps, model_name))
 with open(rec_txt_name, 'w') as f:
 	f.write(recommendations)
 
