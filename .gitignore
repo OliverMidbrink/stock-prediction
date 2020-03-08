@@ -2,4 +2,3 @@ original_dfs/
 datasets/
 .DS_Store
 __pycache__/
-recommendations/
