@@ -144,6 +144,7 @@ def create_sliding_hdf5(output_filename, raw_dataset, hist_time_steps=500, strid
 		n_df = pd.read_hdf(n_file, 'df')
 		print('Done.')
 
+	del df # To save memory
 
 	max_length = int(len(n_df) / (stride) * len(symbols) * 1.1)	# Total amount of data periods 
 
