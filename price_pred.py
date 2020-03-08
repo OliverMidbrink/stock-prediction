@@ -234,23 +234,23 @@ hist_time_steps = 500
 pred_time_steps = [1, 3, 5, 10, 20, 65]	# number of days after last historic time step
 
 	# --- Model ---
-'''
-model = keras.models.Sequential()
-model.add(keras.layers.GRU(120, return_sequences=True, input_shape=(None,6), reset_after = True, recurrent_activation='sigmoid'))	# None for any number of timesteps
-model.add(keras.layers.GRU(120, return_sequences=True, reset_after = True, recurrent_activation='sigmoid'))	# None for any number of timesteps
-model.add(keras.layers.GRU(70, return_sequences=False, reset_after = True, recurrent_activation='sigmoid'))
-model.add(keras.layers.Dense(70))
-model.add(keras.layers.Dropout(0.15))
-model.add(keras.layers.Dense(len(pred_time_steps)))
-'''
+if platform.system() == 'Windows':
+	model = keras.models.Sequential()
+	model.add(keras.layers.CuDNNGRU(120, return_sequences=True, input_shape=(None,6)))	# None for any number of timesteps
+	model.add(keras.layers.CuDNNGRU(120, return_sequences=True))	# None for any number of timesteps
+	model.add(keras.layers.CuDNNGRU(70, return_sequences=False))
+	model.add(keras.layers.Dense(70))
+	model.add(keras.layers.Dropout(0.15))
+	model.add(keras.layers.Dense(len(pred_time_steps)))
 
-model = keras.models.Sequential()
-model.add(keras.layers.CuDNNGRU(120, return_sequences=True, input_shape=(None,6)))	# None for any number of timesteps
-model.add(keras.layers.CuDNNGRU(120, return_sequences=True))	# None for any number of timesteps
-model.add(keras.layers.CuDNNGRU(70, return_sequences=False))
-model.add(keras.layers.Dense(70))
-model.add(keras.layers.Dropout(0.15))
-model.add(keras.layers.Dense(len(pred_time_steps)))
+else:
+	model = keras.models.Sequential()
+	model.add(keras.layers.GRU(120, return_sequences=True, input_shape=(None,6), reset_after = True, recurrent_activation='sigmoid'))	# None for any number of timesteps
+	model.add(keras.layers.GRU(120, return_sequences=True, reset_after = True, recurrent_activation='sigmoid'))	# None for any number of timesteps
+	model.add(keras.layers.GRU(70, return_sequences=False, reset_after = True, recurrent_activation='sigmoid'))
+	model.add(keras.layers.Dense(70))
+	model.add(keras.layers.Dropout(0.15))
+	model.add(keras.layers.Dense(len(pred_time_steps)))
 
 
 filepath = os.path.join('checkpoints', 'to-2019-06-sliding-checkpoints', 'weights-improvement-{epoch:02d}-{val_loss:.6f}.h5')
