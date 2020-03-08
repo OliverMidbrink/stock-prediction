@@ -205,17 +205,17 @@ def create_hdf5(output_filename, raw_dataset, hist_time_steps=30, pred_time_step
 	print('Done. Process took {:.2f} minutes and {} data elements were added.'.format((time.time() - start_time) / 60, len(X_train) + len(X_val) + len(X_test)))
 
 
-data_tools.create_sliding_hdf5(os.path.join('datasets', 'to-2019-06-sliding_dataset.h5'), os.path.join('original_dfs', 'to-2019-06-large.h5'))
+#data_tools.create_sliding_hdf5(os.path.join('datasets', 'to-2019-06-sliding_dataset.h5'), os.path.join('original_dfs', 'to-2019-06-large.h5'))
 #create_hdf5(os.path.join('datasets', '80Day-250Stocks-FROM-2019-06.h5'), os.path.join('original_dfs', 'from-2019-06-to-2020-02-25-swe290ByVOLUME.h5'), hist_time_steps=80)
 #df = pd.read_hdf('top10000-part1.h5', 'df')
 #df.to_csv('top10000-part1.csv')
-sys.exit(0)
+#sys.exit(0)
 
 def load_data(filename):
 	hf = h5py.File(filename, 'r')
-	ret = (np.array(hf.get('X_train')), np.array(hf.get('Y_train')),
-		np.array(hf.get('X_val')), np.array(hf.get('Y_val')),
-		np.array(hf.get('X_test')),np.array(hf.get('Y_test')))
+	ret = (hf.get('X_train'), hf.get('Y_train'),
+		hf.get('X_val'), hf.get('Y_val'),
+		hf.get('X_test'),hf.get('Y_test'))
 
 	return ret
 
@@ -228,10 +228,10 @@ def load_data(filename):
 # 'Top-700-20-year-Swe-120Day.h5'
 # 'Top-100-20-year.h5'
 # '700Swe-20Year-30Day.h5'		
-dataset = os.path.join('datasets', '80Day-250Stocks-FROM-2019-06.h5')
-X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data(dataset)
-hist_time_steps = 80
-pred_time_steps = 7
+dataset = 'to-2019-06-sliding_dataset.h5'
+X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data(os.path.join('datasets', dataset))
+hist_time_steps = 500
+pred_time_steps = [1, 3, 5, 10, 20, 65]	# number of days after last historic time step
 
 	# --- Model ---
 model = keras.models.Sequential()
@@ -240,10 +240,10 @@ model.add(keras.layers.GRU(120, return_sequences=True, reset_after = True, recur
 model.add(keras.layers.GRU(70, return_sequences=False, reset_after = True, recurrent_activation='sigmoid'))
 model.add(keras.layers.Dense(70))
 model.add(keras.layers.Dropout(0.15))
-model.add(keras.layers.Dense(pred_time_steps))
+model.add(keras.layers.Dense(len(pred_time_steps)))
 
 
-filepath = os.path.join('checkpoints', 'to-2019-06-checkpoints', 'weights-improvement-{epoch:02d}-{val_loss:.6f}.h5')
+filepath = os.path.join('checkpoints', 'to-2019-06-sliding-checkpoints', 'weights-improvement-{epoch:02d}-{val_loss:.6f}.h5')
 check = keras.callbacks.callbacks.ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='min', period=1)
 reduce_lr = keras.callbacks.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor=0.5, verbose=1, patience=3, min_lr = 0.00001)
 
@@ -257,22 +257,24 @@ def scalar_augment(X_elem, Y_elem, min_scalar=1, max_scalar=1):
 	#noise = np.random.normal(0, 0.001, X_elem.shape)
 	return X_elem, Y_elem
 
-data_gen = data_tools.CustomSequence(X_train, Y_train, 128, scalar_augment)
+#data_gen = data_tools.CustomSequence(X_train, Y_train, 32, scalar_augment)
+data_gen = data_tools.RandomSequence(X_train, Y_train, 32, scalar_augment)
 
-model_file_name = os.path.join('checkpoints', 'to-2019-06-checkpoints', 'weights-improvement-20-0.000289.h5')
+
+#model_file_name = os.path.join('checkpoints', 'to-2019-06-checkpoints', 'weights-improvement-20-0.000289.h5')
 #model_std_error = np.array([0.39474307, 0.36525669, 0.39066132, 0.38776542, 0.3619745, 0.35675924, 0.34576769])	# Inaccuracy based on train data
-model_std_error = np.array([0.60684879, 0.57097587, 0.57766695, 0.50046783, 0.50637192, 0.59326133, 0.52038012]) # Inaccuracy based on val data
-model = keras.models.load_model(model_file_name)
+#model_std_error = np.array([0.60684879, 0.57097587, 0.57766695, 0.50046783, 0.50637192, 0.59326133, 0.52038012]) # Inaccuracy based on val data
+#model = keras.models.load_model(model_file_name)
 
-#history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
-#	validation_data=(X_val, Y_val), epochs=20, callbacks=[reduce_lr, check])
+history = model.fit_generator(next(iter(data_gen)), steps_per_epoch=len(data_gen), 
+	validation_data=(X_val, Y_val), epochs=20, callbacks=[reduce_lr, check])
 
 #model.save(os.path.join('models', 'parallel.h5'))
 
-#with open(os.path.join('trainHistoryDict', 'to-2019-06_history.txt'), 'wb') as file_pi:
-#        pickle.dump(history.history, file_pi)
+with open(os.path.join('trainHistoryDict', dataset + '_history.txt'), 'wb') as file_pi:
+        pickle.dump(history.history, file_pi)
 
-#sys.exit(0)
+sys.exit(0)
 
 
 def visualize2(X_, Y_, n_plots=2):
