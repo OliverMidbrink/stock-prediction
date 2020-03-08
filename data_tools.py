@@ -174,14 +174,6 @@ def create_sliding_hdf5(output_filename, raw_dataset, hist_time_steps=500, strid
 
 	max_length = int(len(n_df) / (stride) * len(symbols) * 1.1)	# Total amount of data periods 
 
-	X_train = np.zeros((max_length, hist_time_steps, 6))
-	X_val = np.zeros((max_length, hist_time_steps, 6))
-	X_test = np.zeros((max_length, hist_time_steps, 6))
-
-	Y_train = np.zeros((max_length, len(pred_time_steps)))	
-	Y_val = np.zeros((max_length, len(pred_time_steps)))
-	Y_test = np.zeros((max_length, len(pred_time_steps)))
-
 	chunk_size = 1000
 
 	hf = h5py.File(output_filename, 'w')
